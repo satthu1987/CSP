@@ -1,0 +1,18 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "customer-satisfaction-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/customerSatisfaction/CustomerSatisfactionWebPart.js",
+          "manifest": "./src/webparts/customerSatisfaction/CustomerSatisfactionWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "CustomerSatisfactionWebPartStrings": "lib/webparts/customerSatisfaction/loc/{locale}.js"
+  }
+}

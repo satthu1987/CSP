@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "customer-satisfaction-program-client-side-solution",
+    "id": "98cb8ff7-fd1e-4781-bd9c-3d7c463f1430",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.20.0"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "customer-satisfaction-program description"
+      },
+      "longDescription": {
+        "default": "customer-satisfaction-program description"
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "customer-satisfaction-program Feature",
+        "description": "The feature that activates elements of the customer-satisfaction-program solution.",
+        "id": "437574b2-63b2-41c9-97f7-99994de6a3f2",
+        "version": "1.0.0.0"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/customer-satisfaction-program.sppkg"
+  }
+}
