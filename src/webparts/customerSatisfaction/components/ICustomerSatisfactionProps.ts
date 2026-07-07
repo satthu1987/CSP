@@ -1,7 +1,9 @@
+import { WebPartContext } from '@microsoft/sp-webpart-base';
+
 export interface ICustomerSatisfactionProps {
-  description: string;
-  isDarkTheme: boolean;
-  environmentMessage: string;
-  hasTeamsContext: boolean;
-  userDisplayName: string;
+  context: WebPartContext;
+  currentUserEmail: string;
+  currentUserLoginName: string;
+  currentUserDisplayName: string;
+  teamLeaderListName: string;
 }

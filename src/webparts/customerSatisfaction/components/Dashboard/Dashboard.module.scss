@@ -1,0 +1,38 @@
+.mainPlain {
+  flex: 1;
+  background: #fff;
+  overflow-y: auto;
+  min-height: 100vh;
+}
+
+.pageBreadcrumb {
+  padding: 24px 40px 0;
+  font-size: 14px;
+  color: #666;
+
+  strong {
+    color: #ff5722;
+  }
+}
+
+.container {
+  padding: 40px;
+}
+
+.spinnerContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+h2 {
+  margin-top: 0;
+  color: #333;
+  font-size: 28px;
+}
+
+p {
+  color: #666;
+  font-size: 16px;
+}

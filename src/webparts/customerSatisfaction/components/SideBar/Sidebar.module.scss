@@ -1,0 +1,185 @@
+.sidebar {
+  width: 260px;
+  background: #f5f3ff;
+  color: #1f1f1f;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  box-sizing: border-box;
+  position: relative;
+  transition: width 0.25s ease, padding 0.25s ease;
+
+  &.collapsed {
+    width: 72px;
+    padding: 16px 8px;
+
+    .brand {
+      justify-content: center;
+    }
+
+    .navItem {
+      justify-content: center;
+      padding: 10px 0;
+      span {
+        display: none;
+      }
+    }
+
+    .signOutBtn {
+      justify-content: center;
+      padding: 10px 0;
+    }
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.brandLogo {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ff7e1b, #ff3b3b);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.brandTitle {
+  font-weight: 700;
+  font-size: 15px;
+  color: #ff5722;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toggleBtn {
+  position: absolute;
+  top: 28px;
+  right: -14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff5722;
+  z-index: 10;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #ff5722;
+    color: #fff;
+    transform: scale(1.05);
+  }
+
+  i {
+    font-size: 12px;
+  }
+}
+
+.nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-x: hidden;
+}
+
+.navGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.navGroupTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b6b6b;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: #333;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 14px;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  &.active {
+    background: rgba(0, 0, 0, 0.08);
+    font-weight: 600;
+  }
+
+  i {
+    font-size: 16px;
+    min-width: 16px;
+  }
+}
+
+.signOutBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+
+  &:hover {
+    background: #f1f1f1;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 72px;
+    padding: 16px 8px;
+
+    .brand {
+      justify-content: center;
+    }
+
+    .navItem {
+      justify-content: center;
+      padding: 10px 0;
+      span {
+        display: none;
+      }
+    }
+
+    .signOutBtn {
+      justify-content: center;
+      padding: 10px 0;
+    }
+  }
+}

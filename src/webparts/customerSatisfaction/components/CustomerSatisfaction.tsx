@@ -1,42 +1,130 @@
 import * as React from 'react';
 import styles from './CustomerSatisfaction.module.scss';
-import type { ICustomerSatisfactionProps } from './ICustomerSatisfactionProps';
-import { escape } from '@microsoft/sp-lodash-subset';
+import { ICustomerSatisfactionProps } from './ICustomerSatisfactionProps';
+import { ICustomerSatisfactionState, ViewName } from './ICustomerSatisfactionState';
+import { UserRoleService } from '../services/UserRole_Service';
+import Sidebar from './SideBar/Sidebar';
+import Home from './Home/Home';
+import About from './About/About';
+import ActionPlan from './ActionPlan/ActionPlan';
+import Dashboard from './Dashboard/Dashboard';
 
-export default class CustomerSatisfaction extends React.Component<ICustomerSatisfactionProps> {
-  public render(): React.ReactElement<ICustomerSatisfactionProps> {
-    const {
-      description,
-      isDarkTheme,
-      environmentMessage,
-      hasTeamsContext,
-      userDisplayName
-    } = this.props;
+export default class CustomerSatisfaction
+  extends React.Component<ICustomerSatisfactionProps, ICustomerSatisfactionState> {
+
+  private userRoleService: UserRoleService;
+
+  constructor(props: ICustomerSatisfactionProps) {
+    super(props);
+    this.state = {
+      isTeamLeader: false,
+      isLoading: true,
+      sentToday: 0,
+      receivedToday: 0,
+      isSidebarCollapsed: false,
+      currentView: 'home',
+      userService: ''
+    };
+    this.userRoleService = new UserRoleService(props.context, 'UserRole');
+  }
+
+  public async componentDidMount(): Promise<void> {
+    const userRole = await this.userRoleService.getUserRole(this.props.currentUserEmail);
+    const isTeamLeader = userRole !== undefined;
+    const userService = userRole?.Title || '';
+    this.setState({ isTeamLeader, isLoading: false, userService });
+  }
+
+  private navigateTo = (view: ViewName): void => {
+    this.setState({ currentView: view });
+  };
+
+  private renderHome(): JSX.Element {
+    const { isTeamLeader, isLoading, sentToday, receivedToday } = this.state;
+    const { currentUserDisplayName } = this.props;
 
     return (
-      <section className={`${styles.customerSatisfaction} ${hasTeamsContext ? styles.teams : ''}`}>
-        <div className={styles.welcome}>
-          <img alt="" src={isDarkTheme ? require('../assets/welcome-dark.png') : require('../assets/welcome-light.png')} className={styles.welcomeImage} />
-          <h2>Well done, {escape(userDisplayName)}!</h2>
-          <div>{environmentMessage}</div>
-          <div>Web part property value: <strong>{escape(description)}</strong></div>
+      <Home
+        currentUserDisplayName={currentUserDisplayName}
+        isTeamLeader={isTeamLeader}
+        isLoading={isLoading}
+        sentToday={sentToday}
+        receivedToday={receivedToday}
+        onActionClick={() => this.navigateTo('actionplan')}
+      />
+    );
+  }
+
+  private renderAbout(): JSX.Element {
+    return (
+      <main className={styles.mainPlain}>
+        <div className={styles.pageBreadcrumb}>
+          Home › <strong>About</strong>
         </div>
-        <div>
-          <h3>Welcome to SharePoint Framework!</h3>
-          <p>
-            The SharePoint Framework (SPFx) is a extensibility model for Microsoft Viva, Microsoft Teams and SharePoint. It&#39;s the easiest way to extend Microsoft 365 with automatic Single Sign On, automatic hosting and industry standard tooling.
-          </p>
-          <h4>Learn more about SPFx development:</h4>
-          <ul className={styles.links}>
-            <li><a href="https://aka.ms/spfx" target="_blank" rel="noreferrer">SharePoint Framework Overview</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-graph" target="_blank" rel="noreferrer">Use Microsoft Graph in your solution</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-teams" target="_blank" rel="noreferrer">Build for Microsoft Teams using SharePoint Framework</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-viva" target="_blank" rel="noreferrer">Build for Microsoft Viva Connections using SharePoint Framework</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-store" target="_blank" rel="noreferrer">Publish SharePoint Framework applications to the marketplace</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-api" target="_blank" rel="noreferrer">SharePoint Framework API reference</a></li>
-            <li><a href="https://aka.ms/m365pnp" target="_blank" rel="noreferrer">Microsoft 365 Developer Community</a></li>
-          </ul>
+        <About context={this.props.context} />
+      </main>
+    );
+  }
+
+  private renderActionPlan(): JSX.Element {
+    const { userService } = this.state;
+    
+    if (!userService) {
+      return (
+        <main className={styles.mainPlain}>
+          <div className={styles.pageBreadcrumb}>Home › <strong>Action Plan</strong></div>
+          <div style={{ padding: 40 }}>
+            <h2>Action Plan</h2>
+            <p>Service information not available.</p>
+          </div>
+        </main>
+      );
+    }
+
+    return <ActionPlan context={this.props.context} userService={userService} />;
+  }
+
+  private renderDashboard(): JSX.Element {
+    const { currentUserDisplayName } = this.props;
+    return <Dashboard currentUserDisplayName={currentUserDisplayName} />;
+  }
+
+  private renderPlaceholder(title: string): JSX.Element {
+    return (
+      <main className={styles.mainPlain}>
+        <div className={styles.pageBreadcrumb}>Home › <strong>{title}</strong></div>
+        <div style={{ padding: 40 }}>
+          <h2>{title}</h2>
+          <p>This page is under construction.</p>
         </div>
+      </main>
+    );
+  }
+
+  private renderCurrentView(): JSX.Element {
+    switch (this.state.currentView) {
+      case 'home':       return this.renderHome();
+      case 'about':      return this.renderAbout();
+      case 'actionplan': return this.renderActionPlan();
+      case 'dashboard':  return this.renderDashboard();
+      case 'admin':      return this.renderPlaceholder('Admin');
+      default:           return this.renderHome();
+    }
+  }
+
+  public render(): React.ReactElement<ICustomerSatisfactionProps> {
+    const { isSidebarCollapsed, currentView, isTeamLeader } = this.state;
+
+    return (
+      <section className={`${styles.customerSatisfaction} ${isSidebarCollapsed ? styles.collapsed : ''}`}>
+        <Sidebar
+          isTeamLeader={isTeamLeader}
+          isSidebarCollapsed={isSidebarCollapsed}
+          currentView={currentView}
+          onToggleSidebar={() => this.setState(prev => ({ isSidebarCollapsed: !prev.isSidebarCollapsed }))}
+          onNavigate={this.navigateTo}
+        />
+        {this.renderCurrentView()}
       </section>
     );
   }
