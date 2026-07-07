@@ -32,7 +32,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
       isNewMode: false,
       formData: {}
     };
-    this.actionPlanService = new ActionPlanService(props.context, 'ActionPlan');
+    this.actionPlanService = new ActionPlanService(props.context, 'CSP');
   }
 
   public async componentDidMount(): Promise<void> {
@@ -105,48 +105,46 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
   private renderGrid(): JSX.Element {
     const { actionPlans, isLoading } = this.state;
 
-    if (isLoading) {
-      return (
-        <div className={styles.spinnerContainer}>
-          <Spinner size={SpinnerSize.large} label="Loading action plans..." />
-        </div>
-      );
-    }
-
-    if (actionPlans.length === 0) {
-      return (
-        <div className={styles.emptyState}>
-          No action plans found for your service.
-        </div>
-      );
-    }
-
     return (
       <div className={styles.gridContainer}>
-        <div className={styles.gridHeader}>
-          <div className={styles.colTitle}>Title</div>
-          <div className={styles.colStatus}>Status</div>
-          <div className={styles.colTimeline}>Timeline</div>
-          <div className={styles.colCategory}>Category</div>
-        </div>
-        {actionPlans.map(plan => (
-          <div
-            key={plan.Id}
-            className={styles.gridRow}
-            onClick={() => this.openDetailPanel(plan)}
-          >
-            <div className={styles.colTitle}>{plan.Title}</div>
-            <div className={styles.colStatus}>
-              <span className={`${styles.badge} ${styles[`status-${plan.Status?.toLowerCase()}` as keyof typeof styles]}`}>
-                {plan.Status}
-              </span>
-            </div>
-            <div className={styles.colTimeline}>
-              {plan.Timeline ? new Date(plan.Timeline).toLocaleDateString() : '-'}
-            </div>
-            <div className={styles.colCategory}>{plan.Category || '-'}</div>
+        {isLoading ? (
+          <div className={styles.spinnerContainer}>
+            <Spinner size={SpinnerSize.large} label="Loading action plans..." />
           </div>
-        ))}
+        ) : (
+          <>
+            <div className={styles.gridHeader}>
+              <div className={styles.colTitle}>Title</div>
+              <div className={styles.colService}>Service</div>
+              <div className={styles.colPIC}>PIC</div>
+              <div className={styles.colStatus}>Status</div>
+            </div>
+            {actionPlans.length === 0 ? (
+              <div className={styles.emptyMessage}>
+                There is no items in Action List
+              </div>
+            ) : (
+              actionPlans.map(plan => (
+                <div
+                  key={plan.Id}
+                  className={styles.gridRow}
+                  onClick={() => this.openDetailPanel(plan)}
+                >
+                  <div className={styles.colTitle}>{plan.Title}</div>
+                  <div className={styles.colService}>{plan.Service || '-'}</div>
+                  <div className={styles.colPIC}>
+                    {plan.PIC?.Title || '-'}
+                  </div>
+                  <div className={styles.colStatus}>
+                    <span className={`${styles.badge} ${styles[`status-${plan.Status?.toLowerCase()}` as keyof typeof styles]}`}>
+                      {plan.Status || '-'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </>
+        )}
       </div>
     );
   }

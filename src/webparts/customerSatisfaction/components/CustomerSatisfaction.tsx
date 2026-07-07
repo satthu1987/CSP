@@ -25,7 +25,7 @@ export default class CustomerSatisfaction
       currentView: 'home',
       userService: ''
     };
-    this.userRoleService = new UserRoleService(props.context, 'UserRole');
+    this.userRoleService = new UserRoleService(props.context, 'RoleInService');
   }
 
   public async componentDidMount(): Promise<void> {

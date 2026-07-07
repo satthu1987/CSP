@@ -88,7 +88,7 @@
 
 .gridHeader {
   display: grid;
-  grid-template-columns: 2fr 1fr 1.5fr 1.5fr;
+  grid-template-columns: 2fr 1.5fr 1.5fr 1fr;
   gap: 16px;
   padding: 16px;
   background: #f5f5f5;
@@ -100,7 +100,7 @@
 
 .gridRow {
   display: grid;
-  grid-template-columns: 2fr 1fr 1.5fr 1.5fr;
+  grid-template-columns: 2fr 1.5fr 1.5fr 1fr;
   gap: 16px;
   padding: 16px;
   border-bottom: 1px solid #e0e0e0;
@@ -122,14 +122,27 @@
   color: #333;
 }
 
+.colService {
+  color: #666;
+  font-size: 14px;
+}
+
+.colPIC {
+  color: #666;
+  font-size: 14px;
+}
+
 .colStatus {
   text-align: center;
 }
 
-.colTimeline,
-.colCategory {
-  color: #666;
-  font-size: 14px;
+.emptyMessage {
+  padding: 40px 16px;
+  text-align: center;
+  color: #ff9800;
+  font-size: 16px;
+  font-weight: 500;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .badge {
@@ -296,11 +309,10 @@
 
   .gridHeader,
   .gridRow {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 2fr 1fr 1fr;
   }
 
-  .colTimeline,
-  .colCategory {
+  .colPIC {
     display: none;
   }
 }
