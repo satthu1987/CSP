@@ -40,12 +40,14 @@ export class AcDataService {
     }
 
     const data = await response.json();
+
     const items = data.value || [];
 
     // 3. For each item, also fetch FieldValuesAsHtml to get the rendered <img>
     const results: IAcDataItem[] = await Promise.all(
       items.map(async (item: any) => {
-        let imageUrl = this.buildImageUrlFromJson(item.Data, webUrl, listId);
+        console.log('Processing item:', item.Data);
+        let imageUrl = this.buildImageUrlFromJson(item.Data, webUrl, listId, item.Id);
 
         // Fallback: try FieldValuesAsHtml if URL is missing
         if (!imageUrl) {
@@ -88,7 +90,7 @@ export class AcDataService {
    *   {"fileName":"Reserved_ImageAttachment_[4]_[Data]...jpg","originalImageName":"2025 data"}
    * Files live at: {webUrl}/SiteAssets/Lists/{listId}/{fileName}
    */
-  private buildImageUrlFromJson(raw: string, webUrl: string, listId: string): string {
+  private buildImageUrlFromJson(raw: string, webUrl: string, listId: string,itemid:string): string {
     if (!raw) return '';
 
     try {
@@ -104,8 +106,8 @@ export class AcDataService {
 
       // Case 2: Modern image column → build from fileName + list ID
       if (parsed.fileName && listId) {
-        const cleanListId = listId.replace(/[{}]/g, '');
-        return `${webUrl}/SiteAssets/Lists/${cleanListId}/${encodeURIComponent(parsed.fileName)}`;
+       // const cleanListId = listId.replace(/[{}]/g, '');
+        return `${webUrl}/Lists/${this.listName}/Attachments/${itemid}/${encodeURIComponent(parsed.fileName)}`;
       }
 
       return '';

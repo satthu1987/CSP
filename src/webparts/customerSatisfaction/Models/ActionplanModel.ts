@@ -4,10 +4,11 @@ export interface IActionplan {
   Service: string;
   CustomerFeedback: string[];
   Actions: string[];
-  PIC: {
+  PIC?: {
     Title: string;
     EMail: string;
   };
+  PICId?: number;
   Timeline: string;
   Status: string;
   Results: string[];

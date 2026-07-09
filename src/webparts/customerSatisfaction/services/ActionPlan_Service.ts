@@ -2,6 +2,29 @@ import { SPHttpClient, SPHttpClientResponse } from '@microsoft/sp-http';
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { IActionplan } from '../Models/ActionplanModel';
 
+export interface IUserDirectoryEntry {
+  id: number;
+  loginName: string;
+  displayName: string;
+  email: string;
+}
+
+export interface IActionPlanUpsert extends Partial<Omit<IActionplan, 'CustomerFeedback' | 'Actions' | 'Results' | 'PICId'>> {
+  CustomerFeedback?: string[] | string;
+  Actions?: string[] | string;
+  Results?: string[] | string;
+  PICId?: number;
+}
+
+interface IPeoplePickerEntity {
+  Key?: string;
+  DisplayText?: string;
+  Description?: string;
+  EntityData?: {
+    Email?: string;
+  };
+}
+
 export class ActionPlanService {
   private context: WebPartContext;
   private listName: string;
@@ -19,7 +42,7 @@ export class ActionPlanService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Title,Service,CustomerFeedback,Actions,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
+        `?$select=Id,Title,Service,CustomerFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
         `&$expand=PIC` +
         `&$filter=Service eq '${service}'` +
         `&$orderby=Timeline desc`;
@@ -50,7 +73,7 @@ export class ActionPlanService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items(${id})` +
-        `?$select=Id,Title,Service,CustomerFeedback,Actions,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
+        `?$select=Id,Title,Service,CustomerFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
         `&$expand=PIC`;
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.get(
@@ -72,13 +95,13 @@ export class ActionPlanService {
   /**
    * Creates a new action plan item.
    */
-  public async createActionPlan(actionplan: Partial<IActionplan>): Promise<IActionplan | undefined> {
+  public async createActionPlan(actionplan: IActionPlanUpsert): Promise<IActionplan | undefined> {
     try {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items`;
 
-      const body = JSON.stringify(actionplan);
+      const body = JSON.stringify(this.buildActionPlanPayload(actionplan));
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.post(
         endpoint,
@@ -104,35 +127,182 @@ export class ActionPlanService {
     }
   }
 
-  /**
-   * Updates an existing action plan item.
-   */
-  public async updateActionPlan(id: number, actionplan: Partial<IActionplan>): Promise<boolean> {
-    try {
-      const endpoint =
-        `${this.context.pageContext.web.absoluteUrl}` +
-        `/_api/web/lists/getbytitle('${this.listName}')/items(${id})`;
+   /**
+    * Updates an existing action plan item.
+    */
+   public async updateActionPlan(id: number, actionplan: IActionPlanUpsert): Promise<boolean> {
+     try {
+       const endpoint =
+         `${this.context.pageContext.web.absoluteUrl}` +
+         `/_api/web/lists/getbytitle('${this.listName}')/items(${id})`;
 
-      const body = JSON.stringify(actionplan);
+       const body = JSON.stringify(this.buildActionPlanPayload(actionplan));
 
-      const response: SPHttpClientResponse = await this.context.spHttpClient.post(
-        endpoint,
-        SPHttpClient.configurations.v1,
-        {
-          body,
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-HTTP-Method': 'MERGE',
-            'If-Match': '*',
-          },
-        }
-      );
+       const response: SPHttpClientResponse = await this.context.spHttpClient.post(
+         endpoint,
+         SPHttpClient.configurations.v1,
+         {
+           body,
+           headers: {
+             'Accept': 'application/json',
+             'Content-Type': 'application/json',
+             'X-HTTP-Method': 'MERGE',
+             'If-Match': '*',
+           },
+         }
+       );
 
-      return response.ok;
-    } catch (error) {
-      console.error('ActionPlanService updateActionPlan error:', error);
-      return false;
-    }
-  }
+       return response.ok;
+     } catch (error) {
+       console.error('ActionPlanService updateActionPlan error:', error);
+       return false;
+     }
+   }
+
+   /**
+    * Gets choice options for a specific field.
+    */
+   public async getFieldChoices(fieldName: string): Promise<string[]> {
+     try {
+       const endpoint =
+         `${this.context.pageContext.web.absoluteUrl}` +
+         `/_api/web/lists/getbytitle('${this.listName}')/fields/getbytitle('${fieldName}')` +
+         `?$select=Choices`;
+
+       const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+         endpoint,
+         SPHttpClient.configurations.v1
+       );
+
+       if (!response.ok) {
+         console.warn(`Failed to fetch choices for field ${fieldName}:`, response.status);
+         return [];
+       }
+
+       const data = await response.json();
+       console.log(`Choices for ${fieldName}:`, data.Choices);
+       return Array.isArray(data.Choices) ? data.Choices : [];
+     } catch (error) {
+       console.error(`ActionPlanService getFieldChoices error for ${fieldName}:`, error);
+       return [];
+     }
+   }
+
+   /**
+    * Gets all choice field options for dropdown lists.
+    */
+   public async getAllChoiceOptions(): Promise<{ [key: string]: string[] }> {
+     const fields = ['Service', 'Status', 'Category', 'ProductLine', 'Department', 'Division'];
+     const result: { [key: string]: string[] } = {};
+
+     for (const field of fields) {
+       result[field] = await this.getFieldChoices(field);
+     }
+
+     return result;
+   }
+
+   public async searchUsers(query: string): Promise<IUserDirectoryEntry[]> {
+     try {
+       const endpoint =
+         `${this.context.pageContext.web.absoluteUrl}` +
+         `/_api/SP.UI.ApplicationPages.ClientPeoplePickerWebServiceInterface.clientPeoplePickerSearchUser`;
+
+       const response: SPHttpClientResponse = await this.context.spHttpClient.post(
+         endpoint,
+         SPHttpClient.configurations.v1,
+         {
+           body: JSON.stringify({
+             queryParams: {
+               AllowEmailAddresses: true,
+               AllowMultipleEntities: false,
+               AllUrlZones: false,
+               MaximumEntitySuggestions: 12,
+               PrincipalSource: 15,
+               PrincipalType: 1,
+               QueryString: query,
+             },
+           }),
+           headers: {
+             Accept: 'application/json;odata=verbose',
+             'Content-Type': 'application/json;odata=verbose',
+           },
+         }
+       );
+
+       if (!response.ok) {
+         console.warn('Failed to search users:', response.status);
+         return [];
+       }
+
+       const data = await response.json();
+       const rawResults = data?.d?.ClientPeoplePickerSearchUser;
+       const parsedResults = typeof rawResults === 'string' ? (JSON.parse(rawResults) as IPeoplePickerEntity[]) : [];
+       const users = await Promise.all(
+         parsedResults.map(async (user) => {
+           const loginName = user.Key || '';
+           const displayName = user.DisplayText || '';
+           const email = user.EntityData?.Email || user.Description || '';
+           const ensuredUserId = await this.ensureUser(loginName);
+
+           if (!ensuredUserId) {
+             return undefined;
+           }
+
+           return {
+             id: ensuredUserId,
+             loginName,
+             displayName,
+             email,
+           } as IUserDirectoryEntry;
+         })
+       );
+
+       return users.filter((user): user is IUserDirectoryEntry => Boolean(user));
+     } catch (error) {
+       console.error('ActionPlanService searchUsers error:', error);
+       return [];
+     }
+   }
+
+   private buildActionPlanPayload(actionplan: IActionPlanUpsert): IActionPlanUpsert {
+     const payload: IActionPlanUpsert = { ...actionplan };
+
+     delete payload.PIC;
+     payload.PICId = actionplan.PICId;
+
+     return payload;
+   }
+
+   private async ensureUser(loginName: string): Promise<number | undefined> {
+     if (!loginName) {
+       return undefined;
+     }
+
+     try {
+       const endpoint = `${this.context.pageContext.web.absoluteUrl}/_api/web/ensureuser`;
+       const response: SPHttpClientResponse = await this.context.spHttpClient.post(
+         endpoint,
+         SPHttpClient.configurations.v1,
+         {
+           body: JSON.stringify({ logonName: loginName }),
+           headers: {
+             Accept: 'application/json;odata=nometadata',
+             'Content-Type': 'application/json;odata=nometadata',
+           },
+         }
+       );
+
+       if (!response.ok) {
+         console.warn('Failed to ensure user:', loginName, response.status);
+         return undefined;
+       }
+
+       const user = await response.json();
+       return user?.Id as number | undefined;
+     } catch (error) {
+       console.error('ActionPlanService ensureUser error:', error);
+       return undefined;
+     }
+   }
 }

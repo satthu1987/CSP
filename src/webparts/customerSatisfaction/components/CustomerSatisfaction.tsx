@@ -40,17 +40,11 @@ export default class CustomerSatisfaction
   };
 
   private renderHome(): JSX.Element {
-    const { isTeamLeader, isLoading, sentToday, receivedToday } = this.state;
     const { currentUserDisplayName } = this.props;
 
     return (
       <Home
         currentUserDisplayName={currentUserDisplayName}
-        isTeamLeader={isTeamLeader}
-        isLoading={isLoading}
-        sentToday={sentToday}
-        receivedToday={receivedToday}
-        onActionClick={() => this.navigateTo('actionplan')}
       />
     );
   }
