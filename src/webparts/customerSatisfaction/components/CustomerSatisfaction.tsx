@@ -7,6 +7,7 @@ import Sidebar from './SideBar/Sidebar';
 import Home from './Home/Home';
 import About from './About/About';
 import ActionPlan from './ActionPlan/ActionPlan';
+import CustomerFeedback from './CustomerFeedback/CustomerFeedback';
 import Dashboard from './Dashboard/Dashboard';
 
 export default class CustomerSatisfaction
@@ -78,6 +79,24 @@ export default class CustomerSatisfaction
     return <ActionPlan context={this.props.context} userService={userService} />;
   }
 
+  private renderCustomerFeedback(): JSX.Element {
+    const { userService } = this.state;
+
+    if (!userService) {
+      return (
+        <main className={styles.mainPlain}>
+          <div className={styles.pageBreadcrumb}>Home › <strong>Customer Feedback</strong></div>
+          <div style={{ padding: 40 }}>
+            <h2>Customer Feedback</h2>
+            <p>Service information not available.</p>
+          </div>
+        </main>
+      );
+    }
+
+    return <CustomerFeedback context={this.props.context} userService={userService} />;
+  }
+
   private renderDashboard(): JSX.Element {
     const { currentUserDisplayName } = this.props;
     return <Dashboard currentUserDisplayName={currentUserDisplayName} />;
@@ -100,6 +119,7 @@ export default class CustomerSatisfaction
       case 'home':       return this.renderHome();
       case 'about':      return this.renderAbout();
       case 'actionplan': return this.renderActionPlan();
+      case 'customerfeedback': return this.renderCustomerFeedback();
       case 'dashboard':  return this.renderDashboard();
       case 'admin':      return this.renderPlaceholder('Admin');
       default:           return this.renderHome();

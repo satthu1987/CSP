@@ -1,4 +1,4 @@
-export type ViewName = 'home' | 'about' | 'actionplan' | 'dashboard' | 'admin';
+export type ViewName = 'home' | 'about' | 'actionplan' | 'customerfeedback' | 'dashboard' | 'admin';
 
 export interface ICustomerSatisfactionState {
   isTeamLeader: boolean;

@@ -1,18 +1,29 @@
 import * as React from 'react';
 import styles from './ActionPlan.module.scss';
 import { WebPartContext } from '@microsoft/sp-webpart-base';
-import { Icon, Modal, Spinner, SpinnerSize } from '@fluentui/react';
-import { ActionPlanService, IActionPlanUpsert, IUserDirectoryEntry } from '../../services/ActionPlan_Service';
+import { Icon, IPersonaProps, Modal, Spinner, SpinnerSize } from '@fluentui/react';
+import { ActionPlanService, IActionPlanUpsert } from '../../services/ActionPlan_Service';
+import { DivisionServiceService } from '../../services/DivisionService_Service';
 import { IActionplan } from '../../Models/ActionplanModel';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css'; 
-import { PeoplePicker, PrincipalType } from "@pnp/spfx-controls-react/lib/PeoplePicker";
+import { IPeoplePickerContext, PeoplePicker, PrincipalType } from "@pnp/spfx-controls-react/lib/PeoplePicker";
 
 type IActionPlanFormData = IActionPlanUpsert;
 
 export interface IActionPlanProps {
   context: WebPartContext;
   userService: string;
+  /** When true, renders only the modal in new-plan mode (no full page) */
+  isInlineMode?: boolean;
+  /** ID of the CSP_CustomerFeedback item that triggered this form */
+  sourceFeedbackId?: number;
+  /** Text content of the Customer Feedback that triggered this form */
+  sourceFeedbackText?: string;
+  /** Called with the new ActionPlan ID after successful creation in inline mode */
+  onActionPlanCreated?: (actionPlanId: number) => void;
+  /** Called when the user dismisses the modal in inline mode */
+  onInlineDismiss?: () => void;
 }
 
 interface IActionPlanState {
@@ -23,13 +34,14 @@ interface IActionPlanState {
   isNewMode: boolean;
   formData: IActionPlanFormData;
   choiceOptions: { [key: string]: string[] };
-  picOptions: IUserDirectoryEntry[];
-  picSearchText: string;
-  isPicLoading: boolean;
+  departmentServices: string[];
+  isDepartmentServicesLoading: boolean;
 }
 
 export default class ActionPlan extends React.Component<IActionPlanProps, IActionPlanState> {
   private actionPlanService: ActionPlanService;
+  private divisionServiceService: DivisionServiceService;
+  private readonly digitalTechnologySupportDivision = 'Digital Transformation Support';
 
   constructor(props: IActionPlanProps) {
     super(props);
@@ -37,15 +49,18 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
       actionPlans: [],
       isLoading: true,
       selectedActionPlan: undefined,
-      isDetailPanelOpen: false,
-      isNewMode: false,
-      formData: {},
+      isDetailPanelOpen: props.isInlineMode === true,
+      isNewMode: props.isInlineMode === true,
+      formData: {
+        Service: props.userService,
+        CustomerFeedback: props.sourceFeedbackText || undefined
+      },
       choiceOptions: {},
-      picOptions: [],
-      picSearchText: '',
-      isPicLoading: false
+      departmentServices: [],
+      isDepartmentServicesLoading: false
     };
     this.actionPlanService = new ActionPlanService(props.context, 'CSP');
+    this.divisionServiceService = new DivisionServiceService(props.context, 'Division_Service');
   }
 
   public async componentDidMount(): Promise<void> {
@@ -71,17 +86,10 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
        selectedActionPlan: actionPlan,
        isDetailPanelOpen: true,
        isNewMode: false,
-       formData: { ...actionPlan, PICId: actionPlan.PICId },
-       picSearchText: actionPlan.PIC?.Title || '',
-       picOptions: actionPlan.PIC && actionPlan.PICId ? [{
-         id: actionPlan.PICId,
-         loginName: actionPlan.PIC.EMail,
-         displayName: actionPlan.PIC.Title,
-         email: actionPlan.PIC.EMail
-       }] : []
+       formData: { ...actionPlan, PICId: actionPlan.PICId }
      });
 
-     this.loadPicOptions(actionPlan.PIC?.Title || '').catch(error => console.error('Failed to load PIC options:', error));
+     this.loadDepartmentServices(actionPlan.Department).catch(error => console.error('Failed to load Department services:', error));
    };
 
   private openNewActionPanel = (): void => {
@@ -90,22 +98,23 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
       isDetailPanelOpen: true,
       isNewMode: true,
       formData: { Service: this.props.userService },
-      picSearchText: '',
-      picOptions: []
+      departmentServices: [],
+      isDepartmentServicesLoading: false
     });
-
-    this.loadPicOptions('').catch(error => console.error('Failed to load PIC options:', error));
   };
 
   private closeDetailPanel = (): void => {
+    if (this.props.isInlineMode && this.props.onInlineDismiss) {
+      this.props.onInlineDismiss();
+      return;
+    }
     this.setState({
       isDetailPanelOpen: false,
       selectedActionPlan: undefined,
       isNewMode: false,
       formData: {},
-      picOptions: [],
-      picSearchText: '',
-      isPicLoading: false
+      departmentServices: [],
+      isDepartmentServicesLoading: false
     });
   };
 
@@ -118,49 +127,59 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
     }));
   };
 
-  private loadPicOptions = async (query: string): Promise<void> => {
-    this.setState({ isPicLoading: true });
-    const users = await this.actionPlanService.searchUsers(query);
-    this.setState(prev => ({
-      picOptions: this.mergePicOptions(prev.formData.PICId, prev.formData.PIC, users),
-      isPicLoading: false
-    }));
-  };
+  private isDigitalTechnologySupport(department: string | undefined): boolean {
+    return (department || '').trim().toLowerCase() === this.digitalTechnologySupportDivision.toLowerCase();
+  }
 
-  private mergePicOptions = (
-    selectedPicId: number | undefined,
-    selectedPic: IActionplan['PIC'] | undefined,
-    users: IUserDirectoryEntry[]
-  ): IUserDirectoryEntry[] => {
-    const mergedUsers = [...users];
-
-    if (selectedPicId && selectedPic) {
-      const hasSelectedUser = mergedUsers.some(user => user.id === selectedPicId);
-      if (!hasSelectedUser) {
-        mergedUsers.unshift({
-          id: selectedPicId,
-          loginName: selectedPic.EMail,
-          displayName: selectedPic.Title,
-          email: selectedPic.EMail
-        });
-      }
+  private loadDepartmentServices = async (department: string | undefined): Promise<void> => {
+    if (!department || this.isDigitalTechnologySupport(department)) {
+      this.setState({ departmentServices: [], isDepartmentServicesLoading: false });
+      return;
     }
 
-    return mergedUsers;
+    this.setState({ isDepartmentServicesLoading: true });
+    const departmentServices = await this.divisionServiceService.getServicesByDivision(department);
+    this.setState({ departmentServices, isDepartmentServicesLoading: false });
+  };
+
+  private handleDepartmentChange = (department: string): void => {
+    const isDigitalTechnologySupport = this.isDigitalTechnologySupport(department);
+
+    this.setState(prev => ({
+      formData: {
+        ...prev.formData,
+        Department: department,
+        Service: undefined,
+        ProductLine: isDigitalTechnologySupport ? prev.formData.ProductLine : undefined
+      },
+      departmentServices: isDigitalTechnologySupport ? [] : prev.departmentServices,
+      isDepartmentServicesLoading: isDigitalTechnologySupport ? false : prev.isDepartmentServicesLoading
+    }));
+
+    this.loadDepartmentServices(department).catch(error => console.error('Failed to load Department services:', error));
   };
 
   private handleSave = async (): Promise<void> => {
     const { isNewMode, formData } = this.state;
+    
+    // Ensure PICId is included
     const payload: IActionPlanUpsert = {
       ...formData,
       PICId: formData.PICId
     };
 
+    console.log('Saving ActionPlan:', { isNewMode, payload });
+
     if (isNewMode) {
       const result = await this.actionPlanService.createActionPlan(payload);
+      console.log('Create ActionPlan result:', result);
       if (result) {
-        await this.loadActionPlans();
-        this.closeDetailPanel();
+        if (this.props.isInlineMode && this.props.onActionPlanCreated) {
+          this.props.onActionPlanCreated(result.Id);
+        } else {
+          await this.loadActionPlans();
+          this.closeDetailPanel();
+        }
       }
     } else if (this.state.selectedActionPlan) {
       const success = await this.actionPlanService.updateActionPlan(
@@ -235,7 +254,13 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
   }
 
    private renderDetailPanel(): JSX.Element {
-     const { formData, isNewMode, choiceOptions, isDetailPanelOpen } = this.state;
+     const { formData, isNewMode, choiceOptions, isDetailPanelOpen, departmentServices, isDepartmentServicesLoading } = this.state;
+     const isDigitalTechnologySupport = this.isDigitalTechnologySupport(formData.Department);
+     const peoplePickerContext: IPeoplePickerContext = {
+       absoluteUrl: this.props.context.pageContext.web.absoluteUrl,
+       msGraphClientFactory: this.props.context.msGraphClientFactory,
+       spHttpClient: this.props.context.spHttpClient,
+     };
      
 
      return (
@@ -253,7 +278,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
             </button>
           </div>
 
-          <div className={styles.panelBody}>
+        <div className={styles.panelBody}>
           <div className={styles.formGroup}>
             <label>Title</label>
             <input
@@ -264,124 +289,23 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
             />
           </div>
 
-          <div className={styles.formGroup}>
-            <label>PIC</label>
-            <PeoplePicker
-              context={{
-                absoluteUrl: this.props.context.pageContext.web.absoluteUrl,
-                msGraphClientFactory: this.props.context.msGraphClientFactory,
-                spHttpClient: this.props.context.spHttpClient
-              } as any}
-              personSelectionLimit={1}
-              groupName="" 
-              ensureUser={true} 
-              principalTypes={[PrincipalType.User]} 
-              defaultSelectedUsers={formData.PICId ? [formData.PIC?.EMail || ''] : []} 
-              onChange={(items: any[]) => {
-                if (items.length > 0) {
-                  // Cập nhật state hoặc form của bạn tại đây:
-                  this.updateFormField('PICId', items[0].id);
-                  this.updateFormField('PIC', {
-                    Title: items[0].text,
-                    EMail: items[0].secondaryText
-                  });
-                }
-              }}
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Service</label>
-            <select
-              value={formData.Service || ''}
-              onChange={(e) => this.updateFormField('Service', e.target.value)}
-            >
-              <option value="">Select Service</option>
-              {Array.isArray(choiceOptions.Service) && choiceOptions.Service.length > 0 ? (
-                choiceOptions.Service.map(choice => (
-                  <option key={choice} value={choice}>{choice}</option>
-                ))
-              ) : (
-                <option disabled>Loading options...</option>
-              )}
-            </select>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Status</label>
-            <select
-              value={formData.Status || ''}
-              onChange={(e) => this.updateFormField('Status', e.target.value)}
-            >
-              <option value="">Select Status</option>
-              {Array.isArray(choiceOptions.Status) && choiceOptions.Status.length > 0 ? (
-                choiceOptions.Status.map(choice => (
-                  <option key={choice} value={choice}>{choice}</option>
-                ))
-              ) : (
-                <option disabled>Loading options...</option>
-              )}
-            </select>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Category</label>
-            <select
-              value={formData.Category || ''}
-              onChange={(e) => this.updateFormField('Category', e.target.value)}
-            >
-              <option value="">Select Category</option>
-              {Array.isArray(choiceOptions.Category) && choiceOptions.Category.length > 0 ? (
-                choiceOptions.Category.map(choice => (
-                  <option key={choice} value={choice}>{choice}</option>
-                ))
-              ) : (
-                <option disabled>Loading options...</option>
-              )}
-            </select>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Product Line</label>
-            <select
-              value={formData.ProductLine || ''}
-              onChange={(e) => this.updateFormField('ProductLine', e.target.value)}
-            >
-              <option value="">Select Product Line</option>
-              {Array.isArray(choiceOptions.ProductLine) && choiceOptions.ProductLine.length > 0 ? (
-                choiceOptions.ProductLine.map(choice => (
-                  <option key={choice} value={choice}>{choice}</option>
-                ))
-              ) : (
-                <option disabled>Loading options...</option>
-              )}
-            </select>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Timeline</label>
-            <input
-              type="date"
-              value={formData.Timeline ? formData.Timeline.split('T')[0] : ''}
-              onChange={(e) => this.updateFormField('Timeline', e.target.value)}
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Year</label>
-            <input
-              type="text"
-              value={formData.Year || ''}
-              onChange={(e) => this.updateFormField('Year', e.target.value)}
-              placeholder="Enter year"
-            />
-          </div>
+          {this.props.sourceFeedbackId !== undefined && (
+            <div className={styles.formGroup}>
+              <label>Customer Feedback ID</label>
+              <input
+                type="text"
+                value={`#${this.props.sourceFeedbackId}`}
+                readOnly
+                style={{ background: '#f5f5f5', color: '#555', cursor: 'default' }}
+              />
+            </div>
+          )}
 
           <div className={styles.formGroup}>
             <label>Department</label>
             <select
               value={formData.Department || ''}
-              onChange={(e) => this.updateFormField('Department', e.target.value)}
+              onChange={(e) => this.handleDepartmentChange(e.target.value)}
             >
               <option value="">Select Department</option>
               {Array.isArray(choiceOptions.Department) && choiceOptions.Department.length > 0 ? (
@@ -389,7 +313,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
                   <option key={choice} value={choice}>{choice}</option>
                 ))
               ) : (
-                <option disabled>Loading options...</option>
+                <option>Loading options...</option>
               )}
             </select>
           </div>
@@ -406,9 +330,57 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
                   <option key={choice} value={choice}>{choice}</option>
                 ))
               ) : (
-                <option disabled>Loading options...</option>
+                <option>Loading options...</option>
               )}
             </select>
+          </div>
+
+          {!isDigitalTechnologySupport && (
+            <div className={styles.formGroup}>
+              <label>Service</label>
+              <select
+                value={formData.Service || ''}
+                onChange={(e) => this.updateFormField('Service', e.target.value)}
+                disabled={isDepartmentServicesLoading || !formData.Department}
+              >
+                <option value="">Select Service</option>
+                {departmentServices.length > 0 ? (
+                  departmentServices.map(service => (
+                    <option key={service} value={service}>{service}</option>
+                  ))
+                ) : (
+                  <option disabled>{isDepartmentServicesLoading ? 'Loading options...' : 'No service available'}</option>
+                )}
+              </select>
+            </div>
+          )}
+
+          {isDigitalTechnologySupport && (
+            <div className={styles.formGroup}>
+              <label>Product Line</label>
+              <select
+                value={formData.ProductLine || ''}
+                onChange={(e) => this.updateFormField('ProductLine', e.target.value)}
+              >
+                <option value="">Select Product Line</option>
+                {Array.isArray(choiceOptions.ProductLine) && choiceOptions.ProductLine.length > 0 ? (
+                  choiceOptions.ProductLine.map(choice => (
+                    <option key={choice} value={choice}>{choice}</option>
+                  ))
+                ) : (
+                  <option>Loading options...</option>
+                )}
+              </select>
+            </div>
+          )}
+
+          <div className={styles.formGroup}>
+            <label>Timeline</label>
+            <input
+              type="date"
+              value={formData.Timeline ? formData.Timeline.split('T')[0] : ''}
+              onChange={(e) => this.updateFormField('Timeline', e.target.value)}
+            />
           </div>
 
           <div className={styles.formGroup}>
@@ -419,16 +391,10 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
               onChange={(content) => this.updateFormField('CustomerFeedback', content)}
               placeholder="Enter feedback with full format..."
             />
-            {/* <textarea
-              value={formData.CustomerFeedback ? formData.CustomerFeedback.join('\n') : ''}
-              onChange={(e) => this.updateFormField('CustomerFeedback', e.target.value.split('\n'))}
-              placeholder="Enter feedback (one per line)"
-              rows={4}
-            /> */}
           </div>
 
           <div className={styles.formGroup}>
-            <label>Actions</label>
+            <label>Action</label>
             <ReactQuill
               theme="snow"
               value={Array.isArray(formData.Actions) ? formData.Actions.join('\n') : (formData.Actions || '')}
@@ -438,7 +404,96 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
           </div>
 
           <div className={styles.formGroup}>
-            <label>Results</label>
+            <label>PIC</label>
+            <PeoplePicker
+              context={peoplePickerContext}
+              personSelectionLimit={1}
+              groupName=""
+              ensureUser={true}
+              principalTypes={[PrincipalType.User]}
+              defaultSelectedUsers={formData.PICId ? [formData.PIC?.EMail || ''] : []}
+              onChange={(items: IPersonaProps[]) => {
+                if (items.length > 0) {
+                  // Extract user ID from various possible locations
+                  let personId: number | undefined = undefined;
+                  
+                  // Try to get ID from items[0].id
+                  if (items[0].id) {
+                    const idValue = typeof items[0].id === 'string' ? Number(items[0].id) : items[0].id;
+                    if (typeof idValue === 'number' && !isNaN(idValue)) {
+                      personId = idValue;
+                    }
+                  }
+                  
+                  // Log for debugging
+                  console.log('PIC Selected:', {
+                    text: items[0].text,
+                    email: items[0].secondaryText,
+                    id: items[0].id,
+                    extractedPersonId: personId,
+                    fullItem: items[0]
+                  });
+                  
+                  this.updateFormField('PICId', personId);
+                  this.updateFormField('PIC', {
+                    Title: items[0].text || '',
+                    EMail: items[0].secondaryText || ''
+                  });
+                  return;
+                }
+
+                this.updateFormField('PICId', undefined);
+                this.updateFormField('PIC', undefined);
+              }}
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Category</label>
+            <select
+              value={formData.Category || ''}
+              onChange={(e) => this.updateFormField('Category', e.target.value)}
+            >
+              <option value="">Select Category</option>
+              {Array.isArray(choiceOptions.Category) && choiceOptions.Category.length > 0 ? (
+                choiceOptions.Category.map(choice => (
+                  <option key={choice} value={choice}>{choice}</option>
+                ))
+              ) : (
+                <option>Loading options...</option>
+              )}
+            </select>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Status</label>
+            <select
+              value={formData.Status || ''}
+              onChange={(e) => this.updateFormField('Status', e.target.value)}
+            >
+              <option value="">Select Status</option>
+              {Array.isArray(choiceOptions.Status) && choiceOptions.Status.length > 0 ? (
+                choiceOptions.Status.map(choice => (
+                  <option key={choice} value={choice}>{choice}</option>
+                ))
+              ) : (
+                <option>Loading options...</option>
+              )}
+            </select>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Year</label>
+            <input
+              type="text"
+              value={formData.Year || ''}
+              onChange={(e) => this.updateFormField('Year', e.target.value)}
+              placeholder="Enter year"
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Result</label>
             <ReactQuill
               theme="snow"
               value={Array.isArray(formData.Results) ? formData.Results.join('\n') : (formData.Results || '')}
@@ -472,6 +527,10 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
   }
 
   public render(): JSX.Element {
+    if (this.props.isInlineMode) {
+      return this.renderDetailPanel();
+    }
+
     return (
       <main className={styles.mainContainer}>
         <div className={styles.breadcrumb}>Home › <strong>Action Plan</strong></div>

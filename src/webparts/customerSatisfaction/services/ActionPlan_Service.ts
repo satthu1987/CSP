@@ -101,7 +101,10 @@ export class ActionPlanService {
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items`;
 
-      const body = JSON.stringify(this.buildActionPlanPayload(actionplan));
+      const payload = this.buildActionPlanPayload(actionplan);
+      const body = JSON.stringify(payload);
+
+      console.log('Creating ActionPlan with payload:', payload);
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.post(
         endpoint,
@@ -116,11 +119,13 @@ export class ActionPlanService {
       );
 
       if (!response.ok) {
-        console.error('Failed to create action plan');
+        console.error('Failed to create action plan', { status: response.status, statusText: response.statusText });
         return undefined;
       }
 
-      return (await response.json()) as IActionplan;
+      const result = (await response.json()) as IActionplan;
+      console.log('ActionPlan created successfully:', result);
+      return result;
     } catch (error) {
       console.error('ActionPlanService createActionPlan error:', error);
       return undefined;
@@ -268,9 +273,15 @@ export class ActionPlanService {
    private buildActionPlanPayload(actionplan: IActionPlanUpsert): IActionPlanUpsert {
      const payload: IActionPlanUpsert = { ...actionplan };
 
+     // Remove complex objects that shouldn't be sent to SharePoint REST API
      delete payload.PIC;
-     payload.PICId = actionplan.PICId;
+     
+     // Ensure PICId is explicitly set
+     if (actionplan.PICId) {
+       payload.PICId = actionplan.PICId;
+     }
 
+     console.log('buildActionPlanPayload - Input:', actionplan, 'Output:', payload);
      return payload;
    }
 
