@@ -111,6 +111,22 @@
   color: #1f1f1f;
 }
 
+.titleLink {
+  border: none;
+  background: transparent;
+  color: #1f1f1f;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+
+  &:hover {
+    color: #ff5722;
+    text-decoration: underline;
+  }
+}
+
 .colFeedback {
   font-size: 13px;
   color: #555;
@@ -119,6 +135,25 @@
   white-space: nowrap;
   word-break: break-word;
   word-wrap: break-word;
+}
+
+.feedbackLink {
+  border: none;
+  background: transparent;
+  color: #555;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:hover {
+    color: #ff5722;
+    text-decoration: underline;
+  }
 }
 
 .colActionPlan {
@@ -172,5 +207,116 @@
   &:hover {
     background: #ff5722;
     color: #fff;
+  }
+}
+
+.detailHeaderActions {
+  margin-bottom: 16px;
+}
+
+.btnBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #ff5722;
+  color: #ff5722;
+  background: #fff;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #ff5722;
+    color: #fff;
+  }
+}
+
+.detailSection {
+  border: 1px solid #e7e7e7;
+  border-radius: 8px;
+  background: #fff;
+  padding: 20px;
+  margin-bottom: 20px;
+
+  h2 {
+    margin: 0 0 18px;
+    font-size: 18px;
+    color: #1f1f1f;
+  }
+}
+
+.detailRow {
+  margin-bottom: 16px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+
+  div {
+    font-size: 14px;
+    color: #333;
+    line-height: 1.6;
+  }
+}
+
+.feedbackContent {
+  white-space: pre-wrap;
+}
+
+.linkedPlanCard {
+  border: 1px solid #ececec;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fafafa;
+}
+
+.linkedPlanHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.linkedPlanTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f1f1f;
+}
+
+.linkedPlanMeta {
+  font-size: 13px;
+  color: #777;
+  font-weight: 600;
+}
+
+.linkedPlanGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  font-size: 14px;
+  color: #444;
+
+  span {
+    color: #666;
+    font-weight: 600;
+  }
+}
+
+@media (max-width: 768px) {
+  .linkedPlanGrid {
+    grid-template-columns: 1fr;
   }
 }

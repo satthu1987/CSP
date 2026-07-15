@@ -3,8 +3,10 @@ import styles from './CustomerFeedback.module.scss';
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { Icon, Spinner, SpinnerSize } from '@fluentui/react';
 import { CustomerFeedbackService } from '../../services/CustomerFeedback_Service';
+import { ActionPlanService } from '../../services/ActionPlan_Service';
 import { UserRoleService } from '../../services/UserRole_Service';
 import { ICustomerFeedback } from '../../Models/CustomerFeedbackModel';
+import { IActionplan } from '../../Models/ActionplanModel';
 import ActionPlan from '../ActionPlan/ActionPlan';
 
 export interface ICustomerFeedbackProps {
@@ -19,10 +21,15 @@ interface ICustomerFeedbackState {
   activeFeedbackId: number | undefined;
   activeFeedbackText: string | undefined;
   isActionPlanOpen: boolean;
+  isDetailView: boolean;
+  selectedFeedback: ICustomerFeedback | undefined;
+  selectedActionPlan: IActionplan | undefined;
+  isActionPlanLoading: boolean;
 }
 
 export default class CustomerFeedback extends React.Component<ICustomerFeedbackProps, ICustomerFeedbackState> {
   private feedbackService: CustomerFeedbackService;
+  private actionPlanService: ActionPlanService;
   private userRoleService: UserRoleService;
 
   constructor(props: ICustomerFeedbackProps) {
@@ -34,8 +41,13 @@ export default class CustomerFeedback extends React.Component<ICustomerFeedbackP
       activeFeedbackId: undefined,
       activeFeedbackText: undefined,
       isActionPlanOpen: false,
+      isDetailView: false,
+      selectedFeedback: undefined,
+      selectedActionPlan: undefined,
+      isActionPlanLoading: false,
     };
     this.feedbackService = new CustomerFeedbackService(props.context, 'CSP_CustomerFeedback');
+    this.actionPlanService = new ActionPlanService(props.context, 'CSP');
     this.userRoleService = new UserRoleService(props.context, 'RoleInService');
   }
 
@@ -80,7 +92,7 @@ export default class CustomerFeedback extends React.Component<ICustomerFeedbackP
     this.setState({ feedbacks, isLoading: false });
   };
 
-  private stripHtmlTags(html: string): string {
+  private stripHtmlTags(html: string, maxLength?: number): string {
     if (!html) return '';
     
     // Create a temporary element and use textContent to extract plain text
@@ -91,9 +103,9 @@ export default class CustomerFeedback extends React.Component<ICustomerFeedbackP
     // Trim and clean up multiple spaces
     text = text.trim().replace(/\s+/g, ' ');
     
-    // Limit to 150 chars for display in grid
-    if (text.length > 150) {
-      text = text.substring(0, 150) + '...';
+    // Limit text length only when maxLength is provided.
+    if (maxLength !== undefined && maxLength > 0 && text.length > maxLength) {
+      text = text.substring(0, maxLength) + '...';
     }
     
     return text;
@@ -102,6 +114,31 @@ export default class CustomerFeedback extends React.Component<ICustomerFeedbackP
   private handleAddActionPlan = (feedbackId: number, feedbackText: string): void => {
     const cleanedText = this.stripHtmlTags(feedbackText);
     this.setState({ activeFeedbackId: feedbackId, activeFeedbackText: cleanedText, isActionPlanOpen: true });
+  };
+
+  private openDetailView = async (feedback: ICustomerFeedback): Promise<void> => {
+    this.setState({
+      isDetailView: true,
+      selectedFeedback: feedback,
+      selectedActionPlan: undefined,
+      isActionPlanLoading: !!feedback.ActionPlan,
+    });
+
+    if (!feedback.ActionPlan) {
+      return;
+    }
+
+    const actionPlan = await this.actionPlanService.getActionPlanById(feedback.ActionPlan);
+    this.setState({ selectedActionPlan: actionPlan, isActionPlanLoading: false });
+  };
+
+  private backToFeedbackList = (): void => {
+    this.setState({
+      isDetailView: false,
+      selectedFeedback: undefined,
+      selectedActionPlan: undefined,
+      isActionPlanLoading: false,
+    });
   };
 
   private handleActionPlanDismiss = (): void => {
@@ -177,9 +214,23 @@ export default class CustomerFeedback extends React.Component<ICustomerFeedbackP
           <div className={styles.feedbackList}>
             {items.map(item => (
               <div key={item.Id} className={styles.feedbackRow}>
-                <div className={styles.colTitle}>{item.Title || '-'}</div>
+                <div className={styles.colTitle}>
+                  <button
+                    className={styles.titleLink}
+                    onClick={() => this.openDetailView(item)}
+                    title="View detail feedback"
+                  >
+                    {item.Title || '-'}
+                  </button>
+                </div>
                 <div className={styles.colFeedback} title={this.stripHtmlTags(item.CustomerFeedback || '')}>
-                  {this.stripHtmlTags(item.CustomerFeedback || '') || '-'}
+                  <button
+                    className={styles.feedbackLink}
+                    onClick={() => this.openDetailView(item)}
+                    title="View detail feedback"
+                  >
+                    {this.stripHtmlTags(item.CustomerFeedback || '', 150) || '-'}
+                  </button>
                 </div>
                 <div className={styles.colActionPlan}>
                   {item.ActionPlan ? `#${item.ActionPlan}` : '-'}
@@ -193,7 +244,10 @@ export default class CustomerFeedback extends React.Component<ICustomerFeedbackP
                   <button
                     className={styles.btnAdd}
                     title="Add Action Plan"
-                    onClick={() => this.handleAddActionPlan(item.Id, item.CustomerFeedback || '')}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      this.handleAddActionPlan(item.Id, item.CustomerFeedback || '');
+                    }}
                   >
                     <Icon iconName="Add" />
                   </button>
@@ -208,19 +262,106 @@ export default class CustomerFeedback extends React.Component<ICustomerFeedbackP
     return <>{groups}</>;
   }
 
+  private renderActionPlanDetailSection(): JSX.Element {
+    const { selectedFeedback, selectedActionPlan, isActionPlanLoading } = this.state;
+
+    if (!selectedFeedback) {
+      return <></>;
+    }
+
+    return (
+      <section className={styles.detailSection}>
+        <h2>Linked Action Plan</h2>
+
+        {isActionPlanLoading && (
+          <div className={styles.spinnerContainer}>
+            <Spinner size={SpinnerSize.medium} label="Loading action plan..." />
+          </div>
+        )}
+
+        {!isActionPlanLoading && !selectedFeedback.ActionPlan && (
+          <div className={styles.emptyMessage}>No Action Plan linked to this feedback.</div>
+        )}
+
+        {!isActionPlanLoading && selectedFeedback.ActionPlan && !selectedActionPlan && (
+          <div className={styles.emptyMessage}>Linked Action Plan could not be loaded.</div>
+        )}
+
+        {!isActionPlanLoading && selectedActionPlan && (
+          <div className={styles.linkedPlanCard}>
+            <div className={styles.linkedPlanHeader}>
+              <div className={styles.linkedPlanTitle}>{selectedActionPlan.Title || '-'}</div>
+              <div className={styles.linkedPlanMeta}>#{selectedActionPlan.Id}</div>
+            </div>
+            <div className={styles.linkedPlanGrid}>
+              <div>
+                <span>Status:</span> {selectedActionPlan.Status || '-'}
+              </div>
+              <div>
+                <span>Service:</span> {selectedActionPlan.Service || '-'}
+              </div>
+              <div>
+                <span>PIC:</span> {selectedActionPlan.PIC?.Title || '-'}
+              </div>
+              <div>
+                <span>Timeline:</span> {selectedActionPlan.Timeline || '-'}
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  private renderDetailView(): JSX.Element {
+    const { selectedFeedback } = this.state;
+
+    if (!selectedFeedback) {
+      return <></>;
+    }
+
+    return (
+      <>
+        <div className={styles.detailHeaderActions}>
+          <button className={styles.btnBack} onClick={this.backToFeedbackList}>
+            <Icon iconName="Back" />
+            <span>Back</span>
+          </button>
+        </div>
+
+        <section className={styles.detailSection}>
+          <h2>Feedback Information</h2>
+          <div className={styles.detailRow}>
+            <label>Title</label>
+            <div>{selectedFeedback.Title || '-'}</div>
+          </div>
+          <div className={styles.detailRow}>
+            <label>Customer Feedback</label>
+            <div className={styles.feedbackContent}>{this.stripHtmlTags(selectedFeedback.CustomerFeedback || '') || '-'}</div>
+          </div>
+        </section>
+
+        {this.renderActionPlanDetailSection()}
+      </>
+    );
+  }
+
   public render(): JSX.Element {
-    const { isActionPlanOpen, activeFeedbackId, activeFeedbackText } = this.state;
+    const { isActionPlanOpen, activeFeedbackId, activeFeedbackText, isDetailView } = this.state;
 
     return (
       <main className={styles.mainContainer}>
-        <div className={styles.breadcrumb}>Home › <strong>Customer Feedback</strong></div>
+        <div className={styles.breadcrumb}>
+          Home › <strong>Customer Feedback</strong>
+          {isDetailView && <span> › <strong>Detail Feedback</strong></span>}
+        </div>
 
         <div className={styles.header}>
-          <h1>Customer Feedback</h1>
+          <h1>{isDetailView ? 'Detail Feedback' : 'Customer Feedback'}</h1>
         </div>
 
         <div className={styles.content}>
-          {this.renderFeedbackList()}
+          {isDetailView ? this.renderDetailView() : this.renderFeedbackList()}
         </div>
 
         {isActionPlanOpen && activeFeedbackId !== undefined && (
