@@ -2,7 +2,7 @@ import * as React from 'react';
 import styles from './Sidebar.module.scss';
 import { Icon, TooltipHost } from '@fluentui/react';
 
-export type ViewName = 'home' | 'about' | 'actionplan' | 'customerfeedback' | 'dashboard' | 'admin';
+export type ViewName = 'home' | 'about' | 'actionplan' | 'customerfeedback' | 'dashboard' | 'admin' | 'company' | 'iss' | 'is' | 'ss' | 'dts';
 
 export interface ISidebarProps {
   isTeamLeader: boolean;
@@ -12,7 +12,100 @@ export interface ISidebarProps {
   onNavigate: (view: ViewName) => void;
 }
 
-export default class Sidebar extends React.Component<ISidebarProps> {
+interface ISidebarState {
+  expandedMenus: string[];
+}
+
+export default class Sidebar extends React.Component<ISidebarProps, ISidebarState> {
+  constructor(props: ISidebarProps) {
+    super(props);
+    this.state = {
+      expandedMenus: []
+    };
+  }
+
+  private toggleSubmenu = (menuName: string): void => {
+    const expanded = [...this.state.expandedMenus];
+    const index = expanded.indexOf(menuName);
+    if (index > -1) {
+      expanded.splice(index, 1);
+    } else {
+      expanded.push(menuName);
+    }
+    this.setState({ expandedMenus: expanded });
+  };
+
+  private renderSubmenuItem = (
+    label: string,
+    view: ViewName
+  ): JSX.Element => {
+    const { isSidebarCollapsed, currentView, onNavigate } = this.props;
+    const active = currentView === view;
+    const itemClass = `${styles.submenuItem} ${active ? styles.active : ''}`;
+
+    return (
+      <a
+        className={itemClass}
+        key={label}
+        onClick={() => onNavigate(view)}
+      >
+        {!isSidebarCollapsed && <span>{label}</span>}
+      </a>
+    );
+  };
+
+  private renderNavItemWithSubmenu = (
+    iconName: string,
+    label: string,
+    view: ViewName,
+    submenuItems?: Array<{ label: string; view: ViewName }>
+  ): JSX.Element => {
+    const { isSidebarCollapsed, currentView, onNavigate } = this.props;
+    const active = currentView === view || (submenuItems && submenuItems.some(item => currentView === item.view));
+    const isExpanded = this.state.expandedMenus.indexOf(label) > -1;
+    const itemClass = `${styles.navItem} ${active ? styles.active : ''}`;
+
+    const content = (
+      <div key={label}>
+        <a
+          className={itemClass}
+          onClick={() => {
+            if (submenuItems && !isSidebarCollapsed) {
+              this.toggleSubmenu(label);
+            } else if (submenuItems && isSidebarCollapsed) {
+              // When collapsed, navigate directly
+              onNavigate(view);
+            } else {
+              onNavigate(view);
+            }
+          }}
+        >
+          <Icon iconName={iconName} />
+          {!isSidebarCollapsed && (
+            <>
+              <span>{label}</span>
+              {submenuItems && !isSidebarCollapsed && (
+                <Icon
+                  iconName={isExpanded ? 'ChevronDown' : 'ChevronRight'}
+                  style={{ marginLeft: 'auto', fontSize: '12px' }}
+                />
+              )}
+            </>
+          )}
+        </a>
+        {submenuItems && isExpanded && !isSidebarCollapsed && (
+          <div className={styles.submenu}>
+            {submenuItems.map(item => this.renderSubmenuItem(item.label, item.view))}
+          </div>
+        )}
+      </div>
+    );
+
+    return isSidebarCollapsed && submenuItems
+      ? <TooltipHost content={label} key={label}>{content}</TooltipHost>
+      : content;
+  };
+
   private renderNavItem = (
     iconName: string,
     label: string,
@@ -62,20 +155,29 @@ export default class Sidebar extends React.Component<ISidebarProps> {
           <div className={styles.navGroup}>
             {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Home</div>}
             {this.renderNavItem('Home', 'Home', 'home')}
-            {this.renderNavItem('Info', 'About', 'about')}
+            {this.renderNavItem('Info', 'Learn More', 'about')}
+          </div>
+          <div className={styles.navGroup}>
+            {!isSidebarCollapsed && <div className={styles.navGroupTitle}>RESULTS</div>}
+            {this.renderNavItem('Home', 'Company', 'company')}
+            {this.renderNavItemWithSubmenu('Info', 'ISS', 'iss', [
+              { label: 'IS', view: 'is' },
+              { label: 'SS', view: 'ss' }
+            ])}
+            {this.renderNavItem('Info', 'DTS', 'dts')}
           </div>
 
           {isTeamLeader && (
             <>
               <div className={styles.navGroup}>
-                {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Personal</div>}
+                {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Comment & Action Plan</div>}
                 {this.renderNavItem('Edit', 'Action Plan', 'actionplan')}
-              {this.renderNavItem('Feedback', 'Customer Feedback', 'customerfeedback')}
+                {this.renderNavItem('Feedback', 'Customer Feedback', 'customerfeedback')}
               </div>
               <div className={styles.navGroup}>
                 {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Administration</div>}
                 {this.renderNavItem('ViewDashboard', 'Dashboard', 'dashboard')}
-                {this.renderNavItem('Admin', 'Admin', 'admin')}
+                {this.renderNavItem('Admin', 'Role Management', 'admin')}
               </div>
             </>
           )}

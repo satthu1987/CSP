@@ -36,6 +36,9 @@ interface IActionPlanState {
   choiceOptions: { [key: string]: string[] };
   departmentServices: string[];
   isDepartmentServicesLoading: boolean;
+  filterTitle: string;
+  filterPIC: string;
+  filterStatus: string;
 }
 
 export default class ActionPlan extends React.Component<IActionPlanProps, IActionPlanState> {
@@ -57,7 +60,10 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
       },
       choiceOptions: {},
       departmentServices: [],
-      isDepartmentServicesLoading: false
+      isDepartmentServicesLoading: false,
+      filterTitle: '',
+      filterPIC: '',
+      filterStatus: ''
     };
     this.actionPlanService = new ActionPlanService(props.context, 'CSP');
     this.divisionServiceService = new DivisionServiceService(props.context, 'Division_Service');
@@ -92,15 +98,27 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
      this.loadDepartmentServices(actionPlan.Department).catch(error => console.error('Failed to load Department services:', error));
    };
 
-  private openNewActionPanel = (): void => {
+  private openNewActionPanel = async (): Promise<void> => {
+    // Load division based on service first
+    const division = await this.divisionServiceService.getDivisionByService(this.props.userService);
+    
+    // Set state with both Service and Department values
     this.setState({
       selectedActionPlan: undefined,
       isDetailPanelOpen: true,
       isNewMode: true,
-      formData: { Service: this.props.userService },
+      formData: {
+        Service: this.props.userService,
+        Department: division || undefined
+      },
       departmentServices: [],
       isDepartmentServicesLoading: false
     });
+
+    // Load department services if division was found
+    if (division) {
+      this.loadDepartmentServices(division).catch(error => console.error('Failed to load Department services:', error));
+    }
   };
 
   private closeDetailPanel = (): void => {
@@ -206,8 +224,34 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
     }
   }
 
+  private getFilteredActionPlans(): IActionplan[] {
+    const { actionPlans, filterTitle, filterPIC, filterStatus } = this.state;
+    
+    return actionPlans.filter(plan => {
+      const titleMatch = (plan.Title || '').toLowerCase().indexOf(filterTitle.toLowerCase()) > -1;
+      const picMatch = (plan.PIC?.Title || '').toLowerCase().indexOf(filterPIC.toLowerCase()) > -1;
+      const statusMatch = filterStatus === '' || (plan.Status || '').toLowerCase() === filterStatus.toLowerCase();
+      
+      return titleMatch && picMatch && statusMatch;
+    });
+  }
+
   private renderGrid(): JSX.Element {
-    const { actionPlans, isLoading } = this.state;
+    const { actionPlans, isLoading, filterTitle, filterPIC, filterStatus, choiceOptions } = this.state;
+    const filteredPlans = this.getFilteredActionPlans();
+    const statusOptions = Array.isArray(choiceOptions.Status) ? choiceOptions.Status : [];
+    
+    // Build unique PIC list without Array.from for ES5 compatibility
+    const picSet: { [key: string]: boolean } = {};
+    const uniquePICs: string[] = [];
+    actionPlans.forEach(plan => {
+      const picTitle = plan.PIC?.Title;
+      if (picTitle && !picSet[picTitle]) {
+        picSet[picTitle] = true;
+        uniquePICs.push(picTitle);
+      }
+    });
+    uniquePICs.sort();
 
     return (
       <div className={styles.gridContainer}>
@@ -217,18 +261,66 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
           </div>
         ) : (
           <>
+            <div className={styles.filterSection}>
+              <div className={styles.filterGroup}>
+                <label>Title</label>
+                <input
+                  type="text"
+                  placeholder="Search by title..."
+                  value={filterTitle}
+                  onChange={(e) => this.setState({ filterTitle: e.target.value })}
+                  className={styles.filterInput}
+                />
+              </div>
+              
+              <div className={styles.filterGroup}>
+                <label>PIC</label>
+                <select
+                  value={filterPIC}
+                  onChange={(e) => this.setState({ filterPIC: e.target.value })}
+                  className={styles.filterSelect}
+                >
+                  <option value="">All PICs</option>
+                  {uniquePICs.map((pic: string) => (
+                    <option key={pic} value={pic}>{pic}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className={styles.filterGroup}>
+                <label>Status</label>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => this.setState({ filterStatus: e.target.value })}
+                  className={styles.filterSelect}
+                >
+                  <option value="">All Status</option>
+                  {statusOptions.map(status => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <button
+                className={styles.clearFilterBtn}
+                onClick={() => this.setState({ filterTitle: '', filterPIC: '', filterStatus: '' })}
+              >
+                Clear Filters
+              </button>
+            </div>
+
             <div className={styles.gridHeader}>
               <div className={styles.colTitle}>Title</div>
               <div className={styles.colService}>Service</div>
               <div className={styles.colPIC}>PIC</div>
               <div className={styles.colStatus}>Status</div>
             </div>
-            {actionPlans.length === 0 ? (
+            {filteredPlans.length === 0 ? (
               <div className={styles.emptyMessage}>
-                There is no items in Action List
+                {actionPlans.length === 0 ? 'There is no items in Action List' : 'No results matching the filters'}
               </div>
             ) : (
-              actionPlans.map(plan => (
+              filteredPlans.map(plan => (
                 <div
                   key={plan.Id}
                   className={styles.gridRow}
@@ -310,23 +402,6 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
               <option value="">Select Department</option>
               {Array.isArray(choiceOptions.Department) && choiceOptions.Department.length > 0 ? (
                 choiceOptions.Department.map(choice => (
-                  <option key={choice} value={choice}>{choice}</option>
-                ))
-              ) : (
-                <option>Loading options...</option>
-              )}
-            </select>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Division</label>
-            <select
-              value={formData.Division || ''}
-              onChange={(e) => this.updateFormField('Division', e.target.value)}
-            >
-              <option value="">Select Division</option>
-              {Array.isArray(choiceOptions.Division) && choiceOptions.Division.length > 0 ? (
-                choiceOptions.Division.map(choice => (
                   <option key={choice} value={choice}>{choice}</option>
                 ))
               ) : (
@@ -537,7 +612,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
 
         <div className={styles.header}>
           <h1>Action Plans</h1>
-          <button className={styles.btnNewAction} onClick={this.openNewActionPanel}>
+          <button className={styles.btnNewAction} onClick={() => this.openNewActionPanel()}>
             <Icon iconName="Add" /> New Action
           </button>
         </div>

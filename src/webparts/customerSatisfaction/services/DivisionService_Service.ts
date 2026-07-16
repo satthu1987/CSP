@@ -50,4 +50,39 @@ export class DivisionServiceService {
       return [];
     }
   }
+
+  public async getDivisionByService(service: string): Promise<string | undefined> {
+    if (!service) {
+      return undefined;
+    }
+
+    try {
+      const escapedService = service.replace(/'/g, "''");
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items` +
+        `?$select=Division&$filter=Service eq '${escapedService}'&$top=1`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch division by service:', response.status);
+        return undefined;
+      }
+
+      const data = await response.json();
+      const rows = Array.isArray(data.value) ? (data.value as Partial<IDivisionService>[]) : [];
+      if (rows.length > 0) {
+        return rows[0].Division;
+      }
+
+      return undefined;
+    } catch (error) {
+      console.error('DivisionServiceService getDivisionByService error:', error);
+      return undefined;
+    }
+  }
 }

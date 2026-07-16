@@ -8,6 +8,7 @@ import { UserRoleService } from '../../services/UserRole_Service';
 import { ICustomerFeedback } from '../../Models/CustomerFeedbackModel';
 import { IActionplan } from '../../Models/ActionplanModel';
 import ActionPlan from '../ActionPlan/ActionPlan';
+import ReactQuill from 'react-quill';
 
 export interface ICustomerFeedbackProps {
   context: WebPartContext;
@@ -206,31 +207,18 @@ export default class CustomerFeedback extends React.Component<ICustomerFeedbackP
           <div className={styles.serviceGroupHeader}>{service}</div>
           <div className={styles.feedbackRowHeader}>
             <div>Title</div>
-            <div>Customer Feedback</div>
+            <div>Updated Feedback</div>
             <div>Action Plan ID</div>
             <div>Status</div>
             <div />
           </div>
           <div className={styles.feedbackList}>
             {items.map(item => (
-              <div key={item.Id} className={styles.feedbackRow}>
+              <div key={item.Id} className={styles.feedbackRow} onClick={() => this.openDetailView(item)}>
                 <div className={styles.colTitle}>
-                  <button
-                    className={styles.titleLink}
-                    onClick={() => this.openDetailView(item)}
-                    title="View detail feedback"
-                  >
                     {item.Title || '-'}
-                  </button>
                 </div>
-                <div className={styles.colFeedback} title={this.stripHtmlTags(item.CustomerFeedback || '')}>
-                  <button
-                    className={styles.feedbackLink}
-                    onClick={() => this.openDetailView(item)}
-                    title="View detail feedback"
-                  >
-                    {this.stripHtmlTags(item.CustomerFeedback || '', 150) || '-'}
-                  </button>
+                <div className={styles.colFeedback} title={this.stripHtmlTags(item.UpdatedFeedback || '')}>{this.stripHtmlTags(item.UpdatedFeedback || '', 150) || '-'}
                 </div>
                 <div className={styles.colActionPlan}>
                   {item.ActionPlan ? `#${item.ActionPlan}` : '-'}
@@ -241,16 +229,18 @@ export default class CustomerFeedback extends React.Component<ICustomerFeedbackP
                   </span>
                 </div>
                 <div className={styles.colActions}>
-                  <button
-                    className={styles.btnAdd}
-                    title="Add Action Plan"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      this.handleAddActionPlan(item.Id, item.CustomerFeedback || '');
-                    }}
-                  >
-                    <Icon iconName="Add" />
-                  </button>
+                  {!item.ActionPlan && (
+                    <button
+                      className={styles.btnAdd}
+                      title="Add Action Plan"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        this.handleAddActionPlan(item.Id, item.UpdatedFeedback || '');
+                      }}
+                    >
+                      <Icon iconName="Add" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -336,8 +326,24 @@ export default class CustomerFeedback extends React.Component<ICustomerFeedbackP
             <div>{selectedFeedback.Title || '-'}</div>
           </div>
           <div className={styles.detailRow}>
-            <label>Customer Feedback</label>
-            <div className={styles.feedbackContent}>{this.stripHtmlTags(selectedFeedback.CustomerFeedback || '') || '-'}</div>
+            <label>Original Feedback</label>
+            <div className={styles.feedbackContent}>
+              <ReactQuill
+                theme="snow"
+                value={Array.isArray(selectedFeedback.CustomerFeedback) ? selectedFeedback.CustomerFeedback.join('\n') : (selectedFeedback.CustomerFeedback || '')}
+                placeholder="Enter feedback with full format..."
+              />
+            </div>
+          </div>
+          <div className={styles.detailRow}>
+            <label>Updated Feedback</label>
+            <div className={styles.feedbackContent}>
+              <ReactQuill
+                theme="snow"
+                value={Array.isArray(selectedFeedback.UpdatedFeedback) ? selectedFeedback.UpdatedFeedback.join('\n') : (selectedFeedback.CustomerFeedback || '')}
+                placeholder="Enter feedback with full format..."
+              />
+            </div>
           </div>
         </section>
 

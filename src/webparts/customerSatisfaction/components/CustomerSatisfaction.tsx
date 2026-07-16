@@ -54,7 +54,7 @@ export default class CustomerSatisfaction
     return (
       <main className={styles.mainPlain}>
         <div className={styles.pageBreadcrumb}>
-          Home › <strong>About</strong>
+          Home › <strong>Learn More</strong>
         </div>
         <About context={this.props.context} />
       </main>
@@ -97,6 +97,26 @@ export default class CustomerSatisfaction
     return <CustomerFeedback context={this.props.context} userService={userService} />;
   }
 
+  private renderCompany(): JSX.Element {
+    return this.renderPlaceholder('Company');
+  }
+
+  private renderISS(): JSX.Element {
+    return this.renderPlaceholder('ISS');
+  }
+
+  private renderIS(): JSX.Element {
+    return this.renderPlaceholder('IS');
+  }
+
+  private renderSS(): JSX.Element {
+    return this.renderPlaceholder('SS');
+  }
+
+  private renderDTS(): JSX.Element {
+    return this.renderPlaceholder('DTS');
+  }
+
   private renderDashboard(): JSX.Element {
     const { currentUserDisplayName } = this.props;
     return <Dashboard currentUserDisplayName={currentUserDisplayName} />;
@@ -121,7 +141,12 @@ export default class CustomerSatisfaction
       case 'actionplan': return this.renderActionPlan();
       case 'customerfeedback': return this.renderCustomerFeedback();
       case 'dashboard':  return this.renderDashboard();
-      case 'admin':      return this.renderPlaceholder('Admin');
+      case 'company':    return this.renderCompany();
+      case 'iss':        return this.renderISS();
+      case 'is':         return this.renderIS();
+      case 'ss':         return this.renderSS();
+      case 'dts':        return this.renderDTS();
+      case 'admin':      return this.renderPlaceholder('Role Management');
       default:           return this.renderHome();
     }
   }

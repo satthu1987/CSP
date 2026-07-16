@@ -16,7 +16,7 @@ export class CustomerFeedbackService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Title,CustomerFeedback,Service,ActionPlan` +
+        `?$select=Id,Title,CustomerFeedback,UpdatedFeedback,Service,ActionPlan` +
         `&$orderby=Service asc,Title asc`;
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.get(
@@ -57,7 +57,7 @@ export class CustomerFeedbackService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Title,CustomerFeedback,Service,ActionPlan` +
+        `?$select=Id,Title,CustomerFeedback,UpdatedFeedback,Service,ActionPlan` +
         `&$filter=${filters}` +
         `&$orderby=Service asc,Title asc`;
 
