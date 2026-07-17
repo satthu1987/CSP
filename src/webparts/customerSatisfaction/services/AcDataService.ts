@@ -4,6 +4,7 @@ import { WebPartContext } from '@microsoft/sp-webpart-base';
 export interface IAcDataItem {
   Id: number;
   Year: string;
+  Department: string;
   DataUrl: string;
   DataAlt: string;
 }
@@ -27,7 +28,7 @@ export class AcDataService {
     // 2. Fetch items
     const endpoint =
       `${webUrl}/_api/web/lists/getbytitle('${this.listName}')/items` +
-      `?$select=Id,Year,Data&$orderby=Year desc`;
+      `?$select=Id,Year,Department,Data&$orderby=Year desc`;
 
     const response: SPHttpClientResponse = await this.context.spHttpClient.get(
       endpoint,
@@ -57,6 +58,52 @@ export class AcDataService {
         return {
           Id: item.Id,
           Year: item.Year || '',
+          Department: item.Department || '',
+          DataUrl: imageUrl,
+          DataAlt: `${item.Year} Data`
+        };
+      })
+    );
+
+    return results;
+  }
+
+  /** Fetch AC_Data items filtered by Department */
+  public async getAcDataByDepartment(department: string): Promise<IAcDataItem[]> {
+    const webUrl = this.context.pageContext.web.absoluteUrl;
+    const listId = await this.getListId();
+
+    const endpoint =
+      `${webUrl}/_api/web/lists/getbytitle('${this.listName}')/items` +
+      `?$select=Id,Year,Department,Data` +
+      `&$filter=Department eq '${department.replace(/'/g, "''")}'` +
+      `&$orderby=Year desc`;
+
+    const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+      endpoint,
+      SPHttpClient.configurations.v1
+    );
+
+    if (!response.ok) {
+      console.error('Failed to fetch AC_Data by Department:', department);
+      return [];
+    }
+
+    const data = await response.json();
+    const items = data.value || [];
+
+    const results: IAcDataItem[] = await Promise.all(
+      items.map(async (item: any) => {
+        let imageUrl = this.buildImageUrlFromJson(item.Data, webUrl, listId, item.Id);
+
+        if (!imageUrl) {
+          imageUrl = await this.getImageFromHtmlEndpoint(item.Id);
+        }
+
+        return {
+          Id: item.Id,
+          Year: item.Year || '',
+          Department: item.Department || '',
           DataUrl: imageUrl,
           DataAlt: `${item.Year} Data`
         };

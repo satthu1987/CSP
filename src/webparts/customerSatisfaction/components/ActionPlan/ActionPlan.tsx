@@ -4,6 +4,7 @@ import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { Icon, IPersonaProps, Modal, Spinner, SpinnerSize } from '@fluentui/react';
 import { ActionPlanService, IActionPlanUpsert } from '../../services/ActionPlan_Service';
 import { DivisionServiceService } from '../../services/DivisionService_Service';
+import { UserRoleService } from '../../services/UserRole_Service';
 import { IActionplan } from '../../Models/ActionplanModel';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css'; 
@@ -16,10 +17,6 @@ export interface IActionPlanProps {
   userService: string;
   /** When true, renders only the modal in new-plan mode (no full page) */
   isInlineMode?: boolean;
-  /** ID of the CSP_CustomerFeedback item that triggered this form */
-  sourceFeedbackId?: number;
-  /** Text content of the Customer Feedback that triggered this form */
-  sourceFeedbackText?: string;
   /** Called with the new ActionPlan ID after successful creation in inline mode */
   onActionPlanCreated?: (actionPlanId: number) => void;
   /** Called when the user dismisses the modal in inline mode */
@@ -37,13 +34,17 @@ interface IActionPlanState {
   departmentServices: string[];
   isDepartmentServicesLoading: boolean;
   filterTitle: string;
+  filterService: string;
   filterPIC: string;
   filterStatus: string;
+  userServices: string[];
+  isLoadingUserServices: boolean;
 }
 
 export default class ActionPlan extends React.Component<IActionPlanProps, IActionPlanState> {
   private actionPlanService: ActionPlanService;
   private divisionServiceService: DivisionServiceService;
+  private userRoleService: UserRoleService;
   private readonly digitalTechnologySupportDivision = 'Digital Transformation Support';
 
   constructor(props: IActionPlanProps) {
@@ -56,30 +57,61 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
       isNewMode: props.isInlineMode === true,
       formData: {
         Service: props.userService,
-        CustomerFeedback: props.sourceFeedbackText || undefined
       },
       choiceOptions: {},
       departmentServices: [],
       isDepartmentServicesLoading: false,
       filterTitle: '',
+      filterService: '',
       filterPIC: '',
-      filterStatus: ''
+      filterStatus: '',
+      userServices: [],
+      isLoadingUserServices: true
     };
     this.actionPlanService = new ActionPlanService(props.context, 'CSP');
     this.divisionServiceService = new DivisionServiceService(props.context, 'Division_Service');
+    this.userRoleService = new UserRoleService(props.context, 'RoleInService');
   }
 
   public async componentDidMount(): Promise<void> {
+    await this.loadUserServices();
     await Promise.all([
       this.loadActionPlans(),
       this.loadChoiceOptions()
     ]);
   }
 
+  private loadUserServices = async (): Promise<void> => {
+    this.setState({ isLoadingUserServices: true });
+    try {
+      const userEmail = this.props.context.pageContext.user.loginName;
+      const userServices = await this.userRoleService.getUserServices(userEmail);
+      this.setState({ userServices, isLoadingUserServices: false });
+    } catch (error) {
+      console.error('Error loading user services:', error);
+      this.setState({ userServices: [], isLoadingUserServices: false });
+    }
+  };
+
   private loadActionPlans = async (): Promise<void> => {
     this.setState({ isLoading: true });
-    const actionPlans = await this.actionPlanService.getActionPlansByService(this.props.userService);
-    this.setState({ actionPlans, isLoading: false });
+    try {
+      const { userServices } = this.state;
+      let actionPlans: IActionplan[] = [];
+
+      if (userServices.length > 1) {
+        actionPlans = await this.actionPlanService.getActionPlansByServices(userServices);
+      } else if (userServices.length === 1) {
+        actionPlans = await this.actionPlanService.getActionPlansByService(userServices[0]);
+      } else {
+        actionPlans = await this.actionPlanService.getActionPlansByService(this.props.userService);
+      }
+
+      this.setState({ actionPlans, isLoading: false });
+    } catch (error) {
+      console.error('Error loading action plans:', error);
+      this.setState({ actionPlans: [], isLoading: false });
+    }
   };
 
   private loadChoiceOptions = async (): Promise<void> => {
@@ -225,19 +257,20 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
   }
 
   private getFilteredActionPlans(): IActionplan[] {
-    const { actionPlans, filterTitle, filterPIC, filterStatus } = this.state;
+    const { actionPlans, filterTitle, filterService, filterPIC, filterStatus } = this.state;
     
     return actionPlans.filter(plan => {
       const titleMatch = (plan.Title || '').toLowerCase().indexOf(filterTitle.toLowerCase()) > -1;
+      const serviceMatch = filterService === '' || (plan.Service || '').toLowerCase() === filterService.toLowerCase();
       const picMatch = (plan.PIC?.Title || '').toLowerCase().indexOf(filterPIC.toLowerCase()) > -1;
       const statusMatch = filterStatus === '' || (plan.Status || '').toLowerCase() === filterStatus.toLowerCase();
       
-      return titleMatch && picMatch && statusMatch;
+      return titleMatch && serviceMatch && picMatch && statusMatch;
     });
   }
 
   private renderGrid(): JSX.Element {
-    const { actionPlans, isLoading, filterTitle, filterPIC, filterStatus, choiceOptions } = this.state;
+    const { actionPlans, isLoading, filterTitle, filterService, filterPIC, filterStatus, choiceOptions } = this.state;
     const filteredPlans = this.getFilteredActionPlans();
     const statusOptions = Array.isArray(choiceOptions.Status) ? choiceOptions.Status : [];
     
@@ -301,9 +334,27 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
                 </select>
               </div>
               
+              <div className={styles.filterGroup}>
+                <label>Service</label>
+                <select
+                  value={filterService}
+                  onChange={(e) => this.setState({ filterService: e.target.value })}
+                  className={styles.filterSelect}
+                >
+                  <option value="">All Services</option>
+                  {Array.isArray(this.state.userServices) && this.state.userServices.length > 0 ? (
+                    this.state.userServices.map(service => (
+                      <option key={service} value={service}>{service}</option>
+                    ))
+                  ) : (
+                    <option disabled>No services available</option>
+                  )}
+                </select>
+              </div>
+              
               <button
                 className={styles.clearFilterBtn}
-                onClick={() => this.setState({ filterTitle: '', filterPIC: '', filterStatus: '' })}
+                onClick={() => this.setState({ filterTitle: '', filterService: '', filterPIC: '', filterStatus: '' })}
               >
                 Clear Filters
               </button>
@@ -311,9 +362,12 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
 
             <div className={styles.gridHeader}>
               <div className={styles.colTitle}>Title</div>
+              <div className={styles.colDepartment}>Department</div>
               <div className={styles.colService}>Service</div>
-              <div className={styles.colPIC}>PIC</div>
+              <div className={styles.colProductLine}>Product Line</div>
+              <div className={styles.colUpdatedFeedback}>Updated Feedback</div>
               <div className={styles.colStatus}>Status</div>
+              <div className={styles.colAction}>Action</div>
             </div>
             {filteredPlans.length === 0 ? (
               <div className={styles.emptyMessage}>
@@ -324,17 +378,35 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
                 <div
                   key={plan.Id}
                   className={styles.gridRow}
-                  onClick={() => this.openDetailPanel(plan)}
                 >
                   <div className={styles.colTitle}>{plan.Title}</div>
+                  <div className={styles.colDepartment}>{plan.Department || '-'}</div>
                   <div className={styles.colService}>{plan.Service || '-'}</div>
-                  <div className={styles.colPIC}>
-                    {plan.PIC?.Title || '-'}
+                  <div className={styles.colProductLine}>{plan.ProductLine || '-'}</div>
+                  <div className={styles.colUpdatedFeedback}>
+                    {plan.UpdatedFeedback ? plan.UpdatedFeedback.substring(0, 50) + (plan.UpdatedFeedback.length > 50 ? '...' : '') : '-'}
                   </div>
                   <div className={styles.colStatus}>
                     <span className={`${styles.badge} ${this.getStatusClassName(plan.Status)}`}>
                       {plan.Status || '-'}
                     </span>
+                  </div>
+                  <div className={styles.colAction}>
+                    {!plan.Actions || plan.Actions.length === 0 ? (
+                      <Icon
+                        iconName="Add"
+                        className={styles.addIcon}
+                        onClick={() => this.openDetailPanel(plan)}
+                        title="Add Action Plan"
+                      />
+                    ) : (
+                      <Icon
+                        iconName="Edit"
+                        className={styles.editIcon}
+                        onClick={() => this.openDetailPanel(plan)}
+                        title="Edit Action Plan"
+                      />
+                    )}
                   </div>
                 </div>
               ))
@@ -380,18 +452,6 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
               placeholder="Enter title"
             />
           </div>
-
-          {this.props.sourceFeedbackId !== undefined && (
-            <div className={styles.formGroup}>
-              <label>Customer Feedback ID</label>
-              <input
-                type="text"
-                value={`#${this.props.sourceFeedbackId}`}
-                readOnly
-                style={{ background: '#f5f5f5', color: '#555', cursor: 'default' }}
-              />
-            </div>
-          )}
 
           <div className={styles.formGroup}>
             <label>Department</label>
@@ -462,9 +522,19 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
             <label>Customer Feedback</label>
             <ReactQuill
               theme="snow"
-              value={Array.isArray(formData.CustomerFeedback) ? formData.CustomerFeedback.join('\n') : (formData.CustomerFeedback || '')}
+              value={formData.CustomerFeedback || ''}
               onChange={(content) => this.updateFormField('CustomerFeedback', content)}
-              placeholder="Enter feedback with full format..."
+              placeholder="Enter customer feedback..."
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Updated Feedback</label>
+            <ReactQuill
+              theme="snow"
+              value={formData.UpdatedFeedback || ''}
+              onChange={(content) => this.updateFormField('UpdatedFeedback', content)}
+              placeholder="Enter updated feedback..."
             />
           </div>
 

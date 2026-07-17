@@ -1,100 +1,121 @@
 import * as React from 'react';
 import styles from './Home.module.scss';
-import { Icon } from '@fluentui/react';
+import { Icon, Spinner, SpinnerSize } from '@fluentui/react';
+import { WebPartContext } from '@microsoft/sp-webpart-base';
+import { AcDataService, IAcDataItem } from '../../services/AcDataService';
 
 export interface IHomeProps {
+  context: WebPartContext;
   currentUserDisplayName: string;
 }
 
 interface IHomeState {
-  expandedIds: { [key: string]: boolean };
+  acData: IAcDataItem[];
+  isLoading: boolean;
+  expandedIds: { [id: number]: boolean };
 }
 
 export default class Home extends React.Component<IHomeProps, IHomeState> {
+  private acDataService: AcDataService;
+
   constructor(props: IHomeProps) {
     super(props);
     this.state = {
+      acData: [],
+      isLoading: true,
       expandedIds: {}
     };
+    this.acDataService = new AcDataService(props.context);
   }
 
-  private toggleSection = (id: string): void => {
+  public async componentDidMount(): Promise<void> {
+    const allAcData = await this.acDataService.getAcData();
+    // Filter to only include items with Year value
+    const acData = allAcData.filter(item => item.Year && item.Year.trim() !== '');
+    this.setState({ acData, isLoading: false });
+  }
+
+  private toggleSection = (id: number): void => {
     this.setState(prev => ({
       expandedIds: { ...prev.expandedIds, [id]: !prev.expandedIds[id] }
     }));
   };
 
-  private renderCollapsibleSection = (id: string, title: string, content: string): JSX.Element => {
-    const expanded = !!this.state.expandedIds[id];
-    return (
-      <div className={styles.collapsibleSection} key={id}>
-        <button
-          className={styles.sectionHeader}
-          onClick={() => this.toggleSection(id)}
-          aria-expanded={expanded}
-        >
-          <Icon
-            iconName={expanded ? 'ChevronDown' : 'ChevronRight'}
-            className={styles.chevron}
-          />
-          <span className={styles.sectionTitle}>{title}</span>
-        </button>
-        {expanded && (
-          <div className={styles.sectionBody}>
-            <p>{content}</p>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   public render(): JSX.Element {
-    const { currentUserDisplayName } = this.props;
+    const { acData, isLoading, expandedIds } = this.state;
 
     return (
-      <main className={styles.main}>
+      <main className={styles.mainContainer}>
         <div className={styles.breadcrumb}>Home ›</div>
-        <div className={styles.heroContent}>
-          <h1 className={styles.welcomeScript}>Welcome,</h1>
-          <h2 className={styles.userName}>{currentUserDisplayName}</h2>
-        </div>
-
-        <div className={styles.heroVisual}>
-          <img
-            src={require('../../assets/hero-image.png')}
-            alt="Customer Satisfaction Program"
-            className={styles.heroImage}
+        
+        <div className={styles.timelineImageContainer}>
+          <img 
+            src={require('../../assets/csp_timeline.jpg')}
+            alt="CSP Timeline"
+            className={styles.timelineImage}
+            onError={(e) => {
+              console.error('Timeline image failed to load');
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
           />
-          <div className={styles.heroTitle}>
-            <span>CUSTOMER</span>
-            <span>SATISFACTION</span>
-            <span>PROGRAM</span>
-          </div>
         </div>
 
-        <section className={styles.informationSection}>
-          <h2>Learn More</h2>
-          {this.renderCollapsibleSection(
-            'howItWorks',
-            'How It Works',
-            'The Customer Satisfaction Program is designed to gather feedback from our customers and convert it into actionable improvements. Our team systematically collects feedback, analyzes trends, and develops action plans to address customer concerns and enhance overall satisfaction.'
+        <div className={styles.header}>
+          <h1>Results Overview</h1>
+        </div>
+
+        
+
+        <div className={styles.content}>
+          {isLoading ? (
+            <div className={styles.spinnerContainer}>
+              <Spinner size={SpinnerSize.large} label="Loading results..." />
+            </div>
+          ) : acData.length === 0 ? (
+            <div className={styles.emptyState}>No data found in AC_Data list.</div>
+          ) : (
+            <div className={styles.acDataSection}>
+              {acData.map(item => {
+                const expanded = !!expandedIds[item.Id];
+                return (
+                  <div className={styles.acRow} key={item.Id}>
+                    <button
+                      className={styles.acHeader}
+                      onClick={() => this.toggleSection(item.Id)}
+                      aria-expanded={expanded}
+                    >
+                      <Icon
+                        iconName={expanded ? 'ChevronDown' : 'ChevronRight'}
+                        className={styles.acChevron}
+                      />
+                      <span className={styles.acTitle}>
+                        {item.Year} Overall Result
+                      </span>
+                    </button>
+
+                    {expanded && (
+                      <div className={styles.acBody}>
+                        {item.DataUrl ? (
+                          <img src={item.DataUrl}
+                            className={styles.acImage}
+                            onError={(e) => {
+                              console.error('Image failed to load:', item.DataUrl);
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className={styles.emptyState}>
+                            No image available for {item.Year}.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
-          {this.renderCollapsibleSection(
-            'getInvolved',
-            'Get Involved',
-            'We encourage all team members to participate in the Customer Satisfaction Program. You can contribute by actively listening to customer feedback, sharing insights, and helping implement improvements. Visit our Resources section to learn how to get involved and make a difference in our customer relationships.'
-          )}
-          {this.renderCollapsibleSection(
-            'measureInProgram',
-            'Measure in the Program',
-            'Our program measures success through multiple key performance indicators including customer satisfaction scores, feedback response times, action plan completion rates, and customer retention metrics. Regular reporting and data analysis help us track progress and identify areas for continuous improvement.'
-          )}
-          {this.renderCollapsibleSection(
-            'impactedStory',
-            'The Impacted Story',
-            'Real-world customer feedback has led to significant operational improvements and enhanced service delivery. Several customers have reported improved satisfaction levels after their feedback was addressed through our action planning process. These success stories demonstrate the tangible impact of listening to and acting on customer input.'
-          )}
-        </section>
+        </div>
       </main>
     );
   }

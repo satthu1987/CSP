@@ -9,8 +9,8 @@ export interface IUserDirectoryEntry {
   email: string;
 }
 
-export interface IActionPlanUpsert extends Partial<Omit<IActionplan, 'CustomerFeedback' | 'Actions' | 'Results' | 'PICId'>> {
-  CustomerFeedback?: string[] | string;
+export interface IActionPlanUpsert extends Partial<Omit<IActionplan, 'UpdatedFeedback' | 'Actions' | 'Results' | 'PICId'>> {
+  UpdatedFeedback?: string;
   Actions?: string[] | string;
   Results?: string[] | string;
   PICId?: number;
@@ -42,7 +42,7 @@ export class ActionPlanService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Title,Service,CustomerFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
+        `?$select=Id,Title,Service,UpdatedFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
         `&$expand=PIC` +
         `&$filter=Service eq '${service}'` +
         `&$orderby=Timeline desc`;
@@ -66,6 +66,47 @@ export class ActionPlanService {
   }
 
   /**
+   * Gets all action plans filtered by multiple services.
+   */
+  public async getActionPlansByServices(services: string[]): Promise<IActionplan[]> {
+    try {
+      if (!services || services.length === 0) {
+        return [];
+      }
+
+      // Build filter for multiple services
+      const filters = services
+        .filter(s => s && s.trim())
+        .map(s => `Service eq '${s.replace(/'/g, "''")}'`)
+        .join(' or ');
+
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items` +
+        `?$select=Id,Title,Service,UpdatedFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
+        `&$expand=PIC` +
+        `&$filter=${filters}` +
+        `&$orderby=Timeline desc`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch action plans by services');
+        return [];
+      }
+
+      const data = await response.json();
+      return Array.isArray(data.value) ? (data.value as IActionplan[]) : [];
+    } catch (error) {
+      console.error('ActionPlanService getActionPlansByServices error:', error);
+      return [];
+    }
+  }
+
+  /**
    * Gets a single action plan by ID.
    */
   public async getActionPlanById(id: number): Promise<IActionplan | undefined> {
@@ -73,7 +114,7 @@ export class ActionPlanService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items(${id})` +
-        `?$select=Id,Title,Service,CustomerFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
+        `?$select=Id,Title,Service,CustomerFeedback,UpdatedFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
         `&$expand=PIC`;
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.get(

@@ -2,7 +2,8 @@ export interface IActionplan {
   Id: number;
   Title: string;
   Service: string;
-  CustomerFeedback: string[];
+  CustomerFeedback: string;
+  UpdatedFeedback: string;
   Actions: string[];
   PIC?: {
     Title: string;

@@ -2,7 +2,7 @@ import * as React from 'react';
 import styles from './Sidebar.module.scss';
 import { Icon, TooltipHost } from '@fluentui/react';
 
-export type ViewName = 'home' | 'about' | 'actionplan' | 'customerfeedback' | 'dashboard' | 'admin' | 'company' | 'iss' | 'is' | 'ss' | 'dts';
+export type ViewName = 'home' | 'about' | 'actionplan' | 'dashboard' | 'admin' | 'company' | 'iss' | 'is' | 'ss' | 'dts';
 
 export interface ISidebarProps {
   isTeamLeader: boolean;
@@ -172,7 +172,6 @@ export default class Sidebar extends React.Component<ISidebarProps, ISidebarStat
               <div className={styles.navGroup}>
                 {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Comment & Action Plan</div>}
                 {this.renderNavItem('Edit', 'Action Plan', 'actionplan')}
-                {this.renderNavItem('Feedback', 'Customer Feedback', 'customerfeedback')}
               </div>
               <div className={styles.navGroup}>
                 {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Administration</div>}

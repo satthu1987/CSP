@@ -7,7 +7,7 @@ import Sidebar from './SideBar/Sidebar';
 import Home from './Home/Home';
 import About from './About/About';
 import ActionPlan from './ActionPlan/ActionPlan';
-import CustomerFeedback from './CustomerFeedback/CustomerFeedback';
+import Results from './Results/Results';
 import Dashboard from './Dashboard/Dashboard';
 
 export default class CustomerSatisfaction
@@ -45,6 +45,7 @@ export default class CustomerSatisfaction
 
     return (
       <Home
+        context={this.props.context}
         currentUserDisplayName={currentUserDisplayName}
       />
     );
@@ -79,26 +80,8 @@ export default class CustomerSatisfaction
     return <ActionPlan context={this.props.context} userService={userService} />;
   }
 
-  private renderCustomerFeedback(): JSX.Element {
-    const { userService } = this.state;
-
-    if (!userService) {
-      return (
-        <main className={styles.mainPlain}>
-          <div className={styles.pageBreadcrumb}>Home › <strong>Customer Feedback</strong></div>
-          <div style={{ padding: 40 }}>
-            <h2>Customer Feedback</h2>
-            <p>Service information not available.</p>
-          </div>
-        </main>
-      );
-    }
-
-    return <CustomerFeedback context={this.props.context} userService={userService} />;
-  }
-
   private renderCompany(): JSX.Element {
-    return this.renderPlaceholder('Company');
+    return <Results context={this.props.context} department="Company" />;
   }
 
   private renderISS(): JSX.Element {
@@ -106,15 +89,15 @@ export default class CustomerSatisfaction
   }
 
   private renderIS(): JSX.Element {
-    return this.renderPlaceholder('IS');
+    return <Results context={this.props.context} department="IS" />;
   }
 
   private renderSS(): JSX.Element {
-    return this.renderPlaceholder('SS');
+    return <Results context={this.props.context} department="SS" />;
   }
 
   private renderDTS(): JSX.Element {
-    return this.renderPlaceholder('DTS');
+    return <Results context={this.props.context} department="DTS" />;
   }
 
   private renderDashboard(): JSX.Element {
@@ -139,7 +122,6 @@ export default class CustomerSatisfaction
       case 'home':       return this.renderHome();
       case 'about':      return this.renderAbout();
       case 'actionplan': return this.renderActionPlan();
-      case 'customerfeedback': return this.renderCustomerFeedback();
       case 'dashboard':  return this.renderDashboard();
       case 'company':    return this.renderCompany();
       case 'iss':        return this.renderISS();
