@@ -311,6 +311,37 @@ export class ActionPlanService {
      }
    }
 
+  /**
+   * Gets all action plans filtered by department.
+   */
+  public async getActionPlansByDepartment(department: string): Promise<IActionplan[]> {
+    try {
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items` +
+        `?$select=Id,Title,Service,PICId,PIC/EMail,PIC/Title,Timeline,Status,Department` +
+        `&$expand=PIC` +
+        `&$filter=Department eq '${department.replace(/'/g, "''")}'` +
+        `&$orderby=Timeline desc`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch action plans by department');
+        return [];
+      }
+
+      const data = await response.json();
+      return Array.isArray(data.value) ? (data.value as IActionplan[]) : [];
+    } catch (error) {
+      console.error('ActionPlanService getActionPlansByDepartment error:', error);
+      return [];
+    }
+  }
+
    private buildActionPlanPayload(actionplan: IActionPlanUpsert): IActionPlanUpsert {
      const payload: IActionPlanUpsert = { ...actionplan };
 

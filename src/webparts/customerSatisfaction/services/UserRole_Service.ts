@@ -85,4 +85,94 @@ export class UserRoleService {
     const userRole = await this.getUserRole(userEmail);
     return userRole !== undefined;
   }
+
+  /**
+   * Gets all items from the RoleInService list.
+   */
+  public async getAllRoles(): Promise<IUserRole[]> {
+    try {
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items` +
+        `?$select=Id,Title,PIC/EMail,PIC/Title&$expand=PIC&$orderby=Title asc`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch all roles');
+        return [];
+      }
+
+      const data = await response.json();
+      return Array.isArray(data.value) ? (data.value as IUserRole[]) : [];
+    } catch (error) {
+      console.error('UserRoleService getAllRoles error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Creates a new role item in the list.
+   */
+  public async createRole(title: string, picId: number): Promise<boolean> {
+    try {
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items`;
+
+      const body = JSON.stringify({ Title: title, PICId: picId });
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.post(
+        endpoint,
+        SPHttpClient.configurations.v1,
+        {
+          body,
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return response.ok;
+    } catch (error) {
+      console.error('UserRoleService createRole error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Updates an existing role item in the list.
+   */
+  public async updateRole(id: number, title: string, picId: number): Promise<boolean> {
+    try {
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items(${id})`;
+
+      const body = JSON.stringify({ Title: title, PICId: picId });
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.post(
+        endpoint,
+        SPHttpClient.configurations.v1,
+        {
+          body,
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-HTTP-Method': 'MERGE',
+            'If-Match': '*',
+          },
+        }
+      );
+
+      return response.ok;
+    } catch (error) {
+      console.error('UserRoleService updateRole error:', error);
+      return false;
+    }
+  }
 }

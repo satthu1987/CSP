@@ -108,7 +108,7 @@
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 90%) {
   .main {
     padding: 24px 24px;
   }
@@ -119,11 +119,11 @@
 
 .informationSection {
   margin-top: 24px;
-  background: rgba(255, 255, 255, 0.95);
+  background: white;
   border-radius: 12px;
   padding: 32px;
   width: 100%;
-  max-width: 1000px;
+ // max-width: 1000px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 
   h2 {

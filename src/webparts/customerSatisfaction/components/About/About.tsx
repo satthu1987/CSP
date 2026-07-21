@@ -1,96 +1,88 @@
 import * as React from 'react';
 import styles from './About.module.scss';
-import { Icon } from '@fluentui/react';
+import { Icon, Spinner, SpinnerSize } from '@fluentui/react';
+import { WebPartContext } from '@microsoft/sp-webpart-base';
+import { CSPLearnMoreContentService } from '../../services/CSPLearnMoreContent_Service';
+import { ICSPLearnMoreContent } from '../../Models/CSPLearnMoreContent';
 
 export interface IAboutProps {
-  context: any;
+  context: WebPartContext;
 }
 
 interface IAboutState {
-  expandedIds: { [key: string]: boolean };
+  content: ICSPLearnMoreContent[];
+  isLoading: boolean;
+  expandedIds: { [key: number]: boolean };
 }
 
 export default class About extends React.Component<IAboutProps, IAboutState> {
+  private learnMoreService: CSPLearnMoreContentService;
+
   constructor(props: IAboutProps) {
     super(props);
     this.state = {
+      content: [],
+      isLoading: true,
       expandedIds: {}
     };
+    this.learnMoreService = new CSPLearnMoreContentService(props.context);
   }
 
-  private toggleSection = (id: string): void => {
+  public async componentDidMount(): Promise<void> {
+    const content = await this.learnMoreService.getAllContent();
+    this.setState({ content, isLoading: false });
+  }
+
+  private toggleSection = (id: number): void => {
     this.setState(prev => ({
       expandedIds: { ...prev.expandedIds, [id]: !prev.expandedIds[id] }
     }));
   };
 
-  private renderCollapsibleSection = (id: string, title: string, content: string): JSX.Element => {
-    const expanded = !!this.state.expandedIds[id];
+  private renderCollapsibleSection = (item: ICSPLearnMoreContent): JSX.Element => {
+    const expanded = !!this.state.expandedIds[item.Id];
     return (
-      <div className={styles.collapsibleSection} key={id}>
+      <div className={styles.collapsibleSection} key={item.Id}>
         <button
           className={styles.sectionHeader}
-          onClick={() => this.toggleSection(id)}
+          onClick={() => this.toggleSection(item.Id)}
           aria-expanded={expanded}
         >
           <Icon
             iconName={expanded ? 'ChevronDown' : 'ChevronRight'}
             className={styles.chevron}
           />
-          <span className={styles.sectionTitle}>{title}</span>
+          <span className={styles.sectionTitle}>{item.Title}</span>
         </button>
         {expanded && (
-          <div className={styles.sectionBody}>
-            <p>{content}</p>
-          </div>
+          <div
+            className={styles.sectionBody}
+            dangerouslySetInnerHTML={{ __html: item.Content }}
+          />
         )}
       </div>
     );
   };
 
   public render(): JSX.Element {
+    const { content, isLoading } = this.state;
+
     return (
       <main className={styles.main}>
-        <div className={styles.breadcrumb}>Home › <strong>Learn More</strong></div>
-        <div className={styles.heroContent}>
-          <h1 className={styles.welcomeScript}>Welcome to</h1>
-          <h2 className={styles.userName}>CSP Platform</h2>
-        </div>
-
-        <div className={styles.heroVisual}>
-          <img
-            src={require('../../assets/hero-image.png')}
-            alt="Customer Satisfaction Program"
-            className={styles.heroImage}
-          />
-          <div className={styles.heroTitle}>
-            <span>CUSTOMER</span>
-            <span>SATISFACTION</span>
-            <span>PROGRAM</span>
-          </div>
-        </div>
-
         <section className={styles.informationSection}>
-          <h2>Learn More</h2>
-          {this.renderCollapsibleSection(
-            'howItWorks',
-            'How It Works',
-            'The Customer Satisfaction Program is designed to gather feedback from our customers and convert it into actionable improvements. Our team systematically collects feedback, analyzes trends, and develops action plans to address customer concerns and enhance overall satisfaction.'
-          )}
-          {this.renderCollapsibleSection(
-            'getInvolved',
-            'Get Involved',
-            'We encourage all team members to participate in the Customer Satisfaction Program. You can contribute by actively listening to customer feedback, sharing insights, and helping implement improvements. Visit our Resources section to learn how to get involved and make a difference in our customer relationships.'
-          )}
-          {this.renderCollapsibleSection(
-            'measureInProgram',
-            'Measure in the Program',
-            'Our program measures success through multiple key performance indicators including customer satisfaction scores, feedback response times, action plan completion rates, and customer retention metrics. Regular reporting and data analysis help us track progress and identify areas for continuous improvement.'
-          )}
-          {this.renderCollapsibleSection(
-            'impactedStory',
-            'The Impacted Story',
-            'Real-world customer feedback has led to significant operational improvements and enhanced service delivery. Several customers have reported improved satisfaction levels after their feedback was addressed through our action planning process. These success stories demonstrate the tangible impact of listening to and acting on customer input.'
+          <h4 style={{ color: '#000000' }}>Welcome to the Customer Satisfaction Program (CSP)! The program is designed to measure customer satisfaction actively and to identify opportunities for service improvement within Enterprise Services Vietnam (ESVN).
+As a part of Innovation Group, we provides a variety of services in Sale Support, Internal Support, and Software Support to Simpson Strong-Tie worldwide.
+</h4>
+          {isLoading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+              <Spinner size={SpinnerSize.medium} label="Loading content..." />
+            </div>
+          ) : content.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#999', padding: '40px' }}>
+              No content available.
+            </div>
+          ) : (
+            content.map(item => this.renderCollapsibleSection(item))
           )}
         </section>
       </main>

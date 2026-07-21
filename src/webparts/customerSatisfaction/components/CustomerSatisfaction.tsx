@@ -9,6 +9,7 @@ import About from './About/About';
 import ActionPlan from './ActionPlan/ActionPlan';
 import Results from './Results/Results';
 import Dashboard from './Dashboard/Dashboard';
+import RoleManagement from './RoleManagement/RoleManagement';
 
 export default class CustomerSatisfaction
   extends React.Component<ICustomerSatisfactionProps, ICustomerSatisfactionState> {
@@ -100,6 +101,10 @@ export default class CustomerSatisfaction
     return <Results context={this.props.context} department="DTS" />;
   }
 
+  private renderRoleManagement(): JSX.Element {
+    return <RoleManagement context={this.props.context} />;
+  }
+
   private renderDashboard(): JSX.Element {
     const { currentUserDisplayName } = this.props;
     return <Dashboard currentUserDisplayName={currentUserDisplayName} />;
@@ -128,7 +133,7 @@ export default class CustomerSatisfaction
       case 'is':         return this.renderIS();
       case 'ss':         return this.renderSS();
       case 'dts':        return this.renderDTS();
-      case 'admin':      return this.renderPlaceholder('Role Management');
+      case 'admin':      return this.renderRoleManagement();
       default:           return this.renderHome();
     }
   }
