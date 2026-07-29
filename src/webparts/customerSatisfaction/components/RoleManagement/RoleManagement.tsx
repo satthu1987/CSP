@@ -3,33 +3,33 @@ import styles from './RoleManagement.module.scss';
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { Icon, IPersonaProps, Modal, Spinner, SpinnerSize } from '@fluentui/react';
 import { IPeoplePickerContext, PeoplePicker, PrincipalType } from '@pnp/spfx-controls-react/lib/PeoplePicker';
-import { UserRoleService } from '../../services/UserRole_Service';
-import { IUserRole } from '../../Models/UserRole';
+import { CSPUserRole_Service } from '../../services/CSPUserRole_Service';
+import { ICSPUserRole } from '../../Models/CSPUserRole';
 
 export interface IRoleManagementProps {
   context: WebPartContext;
 }
 
 interface IFormData {
-  title: string;
   picId?: number;
   picDisplayName?: string;
   picEmail?: string;
+  role: string; // visitor, leader, admin
 }
 
 interface IRoleManagementState {
-  roles: IUserRole[];
+  roles: ICSPUserRole[];
   isLoading: boolean;
   isPanelOpen: boolean;
   isNewMode: boolean;
-  selectedRole?: IUserRole;
+  selectedRole?: ICSPUserRole;
   formData: IFormData;
   isSaving: boolean;
   errorMsg: string;
 }
 
 export default class RoleManagement extends React.Component<IRoleManagementProps, IRoleManagementState> {
-  private roleService: UserRoleService;
+  private roleService: CSPUserRole_Service;
 
   constructor(props: IRoleManagementProps) {
     super(props);
@@ -39,11 +39,11 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
       isPanelOpen: false,
       isNewMode: false,
       selectedRole: undefined,
-      formData: { title: '' },
+      formData: { role: 'visitor' },
       isSaving: false,
       errorMsg: '',
     };
-    this.roleService = new UserRoleService(props.context, 'RoleInService');
+    this.roleService = new CSPUserRole_Service(props.context);
   }
 
   public async componentDidMount(): Promise<void> {
@@ -66,18 +66,19 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
       isPanelOpen: true,
       isNewMode: true,
       selectedRole: undefined,
-      formData: { title: '' },
+      formData: { role: 'visitor' },
       errorMsg: '',
     });
   };
 
-  private openEditPanel = (role: IUserRole): void => {
+  private openEditPanel = (role: ICSPUserRole): void => {
     this.setState({
       isPanelOpen: true,
       isNewMode: false,
       selectedRole: role,
       formData: {
-        title: role.Title,
+        role: role.Role || 'visitor',
+        picId: role.PIC?.Id,
         picDisplayName: role.PIC?.Title,
         picEmail: role.PIC?.EMail,
       },
@@ -92,12 +93,12 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
   private handleSave = async (): Promise<void> => {
     const { formData, isNewMode, selectedRole } = this.state;
 
-    if (!formData.title.trim()) {
-      this.setState({ errorMsg: 'Role name is required.' });
-      return;
-    }
     if (!formData.picId) {
       this.setState({ errorMsg: 'PIC is required.' });
+      return;
+    }
+    if (!formData.role.trim()) {
+      this.setState({ errorMsg: 'Role is required.' });
       return;
     }
 
@@ -105,9 +106,9 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
 
     let success = false;
     if (isNewMode) {
-      success = await this.roleService.createRole(formData.title.trim(), formData.picId);
+      success = await this.roleService.createRole(formData.picId, formData.role.trim());
     } else if (selectedRole) {
-      success = await this.roleService.updateRole(selectedRole.Id, formData.title.trim(), formData.picId);
+      success = await this.roleService.updateRole(selectedRole.Id, formData.picId, formData.role.trim());
     }
 
     if (success) {
@@ -115,6 +116,24 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
       await this.loadRoles();
     } else {
       this.setState({ isSaving: false, errorMsg: 'Failed to save. Please try again.' });
+    }
+  };
+
+  private handleDelete = async (id: number): Promise<void> => {
+    if (!window.confirm('Are you sure you want to delete this role assignment?')) {
+      return;
+    }
+
+    try {
+      const success = await this.roleService.deleteRole(id);
+      if (success) {
+        await this.loadRoles();
+      } else {
+        alert('Failed to delete role assignment.');
+      }
+    } catch (error) {
+      console.error('Error deleting role:', error);
+      alert('Error deleting role assignment.');
     }
   };
 
@@ -137,15 +156,15 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
       <div className={styles.gridContainer}>
         <div className={styles.gridHeader}>
           <div className={styles.colNo}>#</div>
-          <div className={styles.colRole}>Role</div>
           <div className={styles.colPIC}>PIC</div>
+          <div className={styles.colRole}>Role</div>
           <div className={styles.colAction}>Action</div>
         </div>
         {roles.map((role, index) => (
           <div key={role.Id} className={styles.gridRow}>
             <div className={styles.colNo}>{index + 1}</div>
-            <div className={styles.colRole}>{role.Title}</div>
             <div className={styles.colPIC}>{role.PIC?.Title || '—'}</div>
+            <div className={styles.colRole}>{role.Role || '—'}</div>
             <div className={styles.colAction}>
               <button
                 className={styles.editIcon}
@@ -153,6 +172,13 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
                 onClick={() => this.openEditPanel(role)}
               >
                 <Icon iconName="Edit" />
+              </button>
+              <button
+                className={styles.editIcon}
+                title="Delete"
+                onClick={() => this.handleDelete(role.Id)}
+              >
+                <Icon iconName="Delete" />
               </button>
             </div>
           </div>
@@ -181,7 +207,7 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
       >
         <div className={styles.detailPanel}>
           <div className={styles.panelHeader}>
-            <h2>{isNewMode ? 'New Role' : 'Edit Role'}</h2>
+            <h2>{isNewMode ? 'Assign User Role' : 'Edit User Role'}</h2>
             <button className={styles.closeBtn} onClick={this.closePanel}>
               <Icon iconName="Cancel" />
             </button>
@@ -190,12 +216,15 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
           <div className={styles.panelBody}>
             <div className={styles.formGroup}>
               <label>Role</label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => this.setState({ formData: { ...formData, title: e.target.value } })}
-                placeholder="Enter role name"
-              />
+              <select
+                value={formData.role}
+                onChange={(e) => this.setState({ formData: { ...formData, role: e.target.value } })}
+              >
+                <option value="visitor">Visitor</option>
+                <option value="leader">Leader</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Admin</option>
+              </select>
             </div>
 
             <div className={styles.formGroup}>
@@ -256,7 +285,7 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
           <h1>Role Management</h1>
           <button className={styles.btnNewRole} onClick={this.openNewPanel}>
             <Icon iconName="Add" />
-            New Role
+            Assign User Role
           </button>
         </div>
 

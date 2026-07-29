@@ -21,7 +21,7 @@ export class DivisionServiceService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Service&$filter=Division eq '${escapedDivision}'&$orderby=Service asc`;
+        `?$select=Service,PICId,PIC/EMail,PIC/Title&$filter=Division eq '${escapedDivision}'&$orderby=Service asc&$expand=PIC`;
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.get(
         endpoint,
@@ -47,6 +47,94 @@ export class DivisionServiceService {
       return uniqueServices;
     } catch (error) {
       console.error('DivisionServiceService getServicesByDivision error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Gets all service names from Division_Service where the user is the PIC.
+   */
+  public async getServicesByPIC(userEmail: string): Promise<string[]> {
+    if (!userEmail) {
+      return [];
+    }
+
+    try {
+      const escaped = userEmail.replace(/'/g, "''");
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items` +
+        `?$select=Service,PIC/EMail&$expand=PIC` +
+        `&$filter=PIC/EMail eq '${escaped}'&$orderby=Service asc`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch services by PIC:', response.status);
+        return [];
+      }
+
+      const data = await response.json();
+      const rows = Array.isArray(data.value) ? data.value : [];
+      const uniqueServices: string[] = [];
+
+      rows.forEach((row: { Service?: string }) => {
+        const service = (row.Service || '').trim();
+        if (service && uniqueServices.indexOf(service) === -1) {
+          uniqueServices.push(service);
+        }
+      });
+
+      return uniqueServices;
+    } catch (error) {
+      console.error('DivisionServiceService getServicesByPIC error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Gets all service names from Division_Service where the user is the Manager.
+   */
+  public async getServicesByManager(userEmail: string): Promise<string[]> {
+    if (!userEmail) {
+      return [];
+    }
+
+    try {
+      const escaped = userEmail.replace(/'/g, "''");
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items` +
+        `?$select=Service,Manager/EMail&$expand=Manager` +
+        `&$filter=Manager/EMail eq '${escaped}'&$orderby=Service asc`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch services by Manager:', response.status);
+        return [];
+      }
+
+      const data = await response.json();
+      const rows = Array.isArray(data.value) ? data.value : [];
+      const uniqueServices: string[] = [];
+
+      rows.forEach((row: { Service?: string }) => {
+        const service = (row.Service || '').trim();
+        if (service && uniqueServices.indexOf(service) === -1) {
+          uniqueServices.push(service);
+        }
+      });
+
+      return uniqueServices;
+    } catch (error) {
+      console.error('DivisionServiceService getServicesByManager error:', error);
       return [];
     }
   }

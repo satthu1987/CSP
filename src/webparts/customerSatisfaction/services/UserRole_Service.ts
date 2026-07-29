@@ -79,6 +79,40 @@ export class UserRoleService {
   }
 
   /**
+   * Gets all services where the user is the Manager in the RoleInService list.
+   * Returns an array of service titles (strings).
+   */
+  public async getManagerServices(userEmail: string): Promise<string[]> {
+    try {
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items` +
+        `?$select=Title,Manager/EMail&$expand=Manager` +
+        `&$filter=Manager/EMail eq '${userEmail}'`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch manager services');
+        return [];
+      }
+
+      const data = await response.json();
+      if (Array.isArray(data.value)) {
+        return data.value.map((item: { Title: string }) => item.Title).filter((title: string) => title);
+      }
+
+      return [];
+    } catch (error) {
+      console.error('UserRoleService getManagerServices error:', error);
+      return [];
+    }
+  }
+
+  /**
    * Checks if the current user exists in the UserRole SharePoint list.
    */
   public async isUserInRole(userEmail: string): Promise<boolean> {

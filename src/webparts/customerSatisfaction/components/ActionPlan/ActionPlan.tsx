@@ -4,7 +4,6 @@ import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { Icon, IPersonaProps, Modal, Spinner, SpinnerSize } from '@fluentui/react';
 import { ActionPlanService, IActionPlanUpsert } from '../../services/ActionPlan_Service';
 import { DivisionServiceService } from '../../services/DivisionService_Service';
-import { UserRoleService } from '../../services/UserRole_Service';
 import { IActionplan } from '../../Models/ActionplanModel';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css'; 
@@ -15,6 +14,14 @@ type IActionPlanFormData = IActionPlanUpsert;
 export interface IActionPlanProps {
   context: WebPartContext;
   userService: string;
+  /**
+   * Controls how action plans are loaded:
+   * - 'admin': loads all action plans (no filter)
+   * - 'leader': loads plans by PIC from RoleInService list
+   * - 'manager': loads plans by Manager from RoleInService list
+   * Defaults to 'leader' behaviour if omitted.
+   */
+  filterMode?: 'admin' | 'leader' | 'manager';
   /** When true, renders only the modal in new-plan mode (no full page) */
   isInlineMode?: boolean;
   /** Called with the new ActionPlan ID after successful creation in inline mode */
@@ -37,6 +44,7 @@ interface IActionPlanState {
   filterService: string;
   filterPIC: string;
   filterStatus: string;
+  filterYear: string;
   userServices: string[];
   isLoadingUserServices: boolean;
 }
@@ -44,8 +52,7 @@ interface IActionPlanState {
 export default class ActionPlan extends React.Component<IActionPlanProps, IActionPlanState> {
   private actionPlanService: ActionPlanService;
   private divisionServiceService: DivisionServiceService;
-  private userRoleService: UserRoleService;
-  private readonly digitalTechnologySupportDivision = 'Digital Transformation Support';
+  private readonly digitalTechnologySupportDivision = 'Digital Technology Support';
 
   constructor(props: IActionPlanProps) {
     super(props);
@@ -65,12 +72,12 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
       filterService: '',
       filterPIC: '',
       filterStatus: '',
+      filterYear: '',
       userServices: [],
       isLoadingUserServices: true
     };
     this.actionPlanService = new ActionPlanService(props.context, 'CSP');
     this.divisionServiceService = new DivisionServiceService(props.context, 'Division_Service');
-    this.userRoleService = new UserRoleService(props.context, 'RoleInService');
   }
 
   public async componentDidMount(): Promise<void> {
@@ -85,7 +92,15 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
     this.setState({ isLoadingUserServices: true });
     try {
       const userEmail = this.props.context.pageContext.user.loginName;
-      const userServices = await this.userRoleService.getUserServices(userEmail);
+      const { filterMode } = this.props;
+      let userServices: string[] = [];
+
+      if (filterMode === 'manager') {
+        userServices = await this.divisionServiceService.getServicesByManager(userEmail);
+      } else if (filterMode === 'leader') {
+        userServices = await this.divisionServiceService.getServicesByPIC(userEmail);
+      }
+
       this.setState({ userServices, isLoadingUserServices: false });
     } catch (error) {
       console.error('Error loading user services:', error);
@@ -96,10 +111,14 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
   private loadActionPlans = async (): Promise<void> => {
     this.setState({ isLoading: true });
     try {
+      const { filterMode } = this.props;
       const { userServices } = this.state;
       let actionPlans: IActionplan[] = [];
 
-      if (userServices.length > 1) {
+      if (filterMode === 'admin') {
+        // Admin sees all action plans
+        actionPlans = await this.actionPlanService.getAllActionPlans();
+      } else if (userServices.length > 1) {
         actionPlans = await this.actionPlanService.getActionPlansByServices(userServices);
       } else if (userServices.length === 1) {
         actionPlans = await this.actionPlanService.getActionPlansByService(userServices[0]);
@@ -120,6 +139,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
   };
 
    private openDetailPanel = (actionPlan: IActionplan): void => {
+    const isDigitalTechnologySupport = this.isDigitalTechnologySupport(actionPlan.Department);
      this.setState({
        selectedActionPlan: actionPlan,
        isDetailPanelOpen: true,
@@ -127,12 +147,16 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
        formData: { ...actionPlan, PICId: actionPlan.PICId }
      });
 
-     this.loadDepartmentServices(actionPlan.Department).catch(error => console.error('Failed to load Department services:', error));
+     const serviceLookupDivision = isDigitalTechnologySupport
+       ? (actionPlan.ProductLine || actionPlan.Department)
+       : actionPlan.Department;
+     this.loadDepartmentServices(serviceLookupDivision).catch(error => console.error('Failed to load Department services:', error));
    };
 
   private openNewActionPanel = async (): Promise<void> => {
     // Load division based on service first
     const division = await this.divisionServiceService.getDivisionByService(this.props.userService);
+    const isDigitalTechnologySupport = this.isDigitalTechnologySupport(division);
     
     // Set state with both Service and Department values
     this.setState({
@@ -140,15 +164,16 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
       isDetailPanelOpen: true,
       isNewMode: true,
       formData: {
-        Service: this.props.userService,
+        Service: isDigitalTechnologySupport ? undefined : this.props.userService,
+        ProductLine: undefined,
         Department: division || undefined
       },
       departmentServices: [],
       isDepartmentServicesLoading: false
     });
 
-    // Load department services if division was found
-    if (division) {
+    // Load service options immediately only for non-DTS departments.
+    if (division && !isDigitalTechnologySupport) {
       this.loadDepartmentServices(division).catch(error => console.error('Failed to load Department services:', error));
     }
   };
@@ -182,7 +207,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
   }
 
   private loadDepartmentServices = async (department: string | undefined): Promise<void> => {
-    if (!department || this.isDigitalTechnologySupport(department)) {
+    if (!department) {
       this.setState({ departmentServices: [], isDepartmentServicesLoading: false });
       return;
     }
@@ -202,11 +227,33 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
         Service: undefined,
         ProductLine: isDigitalTechnologySupport ? prev.formData.ProductLine : undefined
       },
-      departmentServices: isDigitalTechnologySupport ? [] : prev.departmentServices,
-      isDepartmentServicesLoading: isDigitalTechnologySupport ? false : prev.isDepartmentServicesLoading
+      departmentServices: [],
+      isDepartmentServicesLoading: false
     }));
 
+    if (!department || isDigitalTechnologySupport) {
+      return;
+    }
+
     this.loadDepartmentServices(department).catch(error => console.error('Failed to load Department services:', error));
+  };
+
+  private handleProductLineChange = (productLine: string): void => {
+    this.setState(prev => ({
+      formData: {
+        ...prev.formData,
+        ProductLine: productLine,
+        Service: undefined,
+      },
+      departmentServices: [],
+      isDepartmentServicesLoading: false
+    }));
+
+    if (!productLine) {
+      return;
+    }
+
+    this.loadDepartmentServices(productLine).catch(error => console.error('Failed to load Product Line services:', error));
   };
 
   private handleSave = async (): Promise<void> => {
@@ -257,20 +304,30 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
   }
 
   private getFilteredActionPlans(): IActionplan[] {
-    const { actionPlans, filterTitle, filterService, filterPIC, filterStatus } = this.state;
+    const { actionPlans, filterTitle, filterService, filterPIC, filterStatus, filterYear } = this.state;
     
     return actionPlans.filter(plan => {
       const titleMatch = (plan.Title || '').toLowerCase().indexOf(filterTitle.toLowerCase()) > -1;
       const serviceMatch = filterService === '' || (plan.Service || '').toLowerCase() === filterService.toLowerCase();
       const picMatch = (plan.PIC?.Title || '').toLowerCase().indexOf(filterPIC.toLowerCase()) > -1;
       const statusMatch = filterStatus === '' || (plan.Status || '').toLowerCase() === filterStatus.toLowerCase();
+      const yearMatch = filterYear === '' || (plan.Year || '') === filterYear;
       
-      return titleMatch && serviceMatch && picMatch && statusMatch;
+      return titleMatch && serviceMatch && picMatch && statusMatch && yearMatch;
     });
   }
 
+  private getYearOptions(): string[] {
+    const currentYear = new Date().getFullYear();
+    const years: string[] = [];
+    for (let i = -3; i <= 3; i++) {
+      years.push((currentYear + i).toString());
+    }
+    return years;
+  }
+
   private renderGrid(): JSX.Element {
-    const { actionPlans, isLoading, filterTitle, filterService, filterPIC, filterStatus, choiceOptions } = this.state;
+    const { actionPlans, isLoading, filterTitle, filterService, filterPIC, filterStatus, filterYear, choiceOptions } = this.state;
     const filteredPlans = this.getFilteredActionPlans();
     const statusOptions = Array.isArray(choiceOptions.Status) ? choiceOptions.Status : [];
     
@@ -335,6 +392,20 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
               </div>
               
               <div className={styles.filterGroup}>
+                <label>Year</label>
+                <select
+                  value={filterYear}
+                  onChange={(e) => this.setState({ filterYear: e.target.value })}
+                  className={styles.filterSelect}
+                >
+                  <option value="">All Years</option>
+                  {this.getYearOptions().map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className={styles.filterGroup}>
                 <label>Service</label>
                 <select
                   value={filterService}
@@ -354,7 +425,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
               
               <button
                 className={styles.clearFilterBtn}
-                onClick={() => this.setState({ filterTitle: '', filterService: '', filterPIC: '', filterStatus: '' })}
+                onClick={() => this.setState({ filterTitle: '', filterService: '', filterPIC: '', filterStatus: '', filterYear: '' })}
               >
                 Clear Filters
               </button>
@@ -365,7 +436,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
               <div className={styles.colDepartment}>Department</div>
               <div className={styles.colService}>Service</div>
               <div className={styles.colProductLine}>Product Line</div>
-              <div className={styles.colUpdatedFeedback}>Updated Feedback</div>
+              <div className={styles.colUpdatedFeedback}>Customer Feedback</div>
               <div className={styles.colStatus}>Status</div>
               <div className={styles.colAction}>Action</div>
             </div>
@@ -384,7 +455,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
                   <div className={styles.colService}>{plan.Service || '-'}</div>
                   <div className={styles.colProductLine}>{plan.ProductLine || '-'}</div>
                   <div className={styles.colUpdatedFeedback}>
-                    {plan.UpdatedFeedback ? plan.UpdatedFeedback.substring(0, 50) + (plan.UpdatedFeedback.length > 50 ? '...' : '') : '-'}
+                    {plan.CustomerFeedback ? plan.CustomerFeedback.substring(0, 50) + (plan.CustomerFeedback.length > 50 ? '...' : '') : '-'}
                   </div>
                   <div className={styles.colStatus}>
                     <span className={`${styles.badge} ${this.getStatusClassName(plan.Status)}`}>
@@ -470,32 +541,12 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
             </select>
           </div>
 
-          {!isDigitalTechnologySupport && (
-            <div className={styles.formGroup}>
-              <label>Service</label>
-              <select
-                value={formData.Service || ''}
-                onChange={(e) => this.updateFormField('Service', e.target.value)}
-                disabled={isDepartmentServicesLoading || !formData.Department}
-              >
-                <option value="">Select Service</option>
-                {departmentServices.length > 0 ? (
-                  departmentServices.map(service => (
-                    <option key={service} value={service}>{service}</option>
-                  ))
-                ) : (
-                  <option disabled>{isDepartmentServicesLoading ? 'Loading options...' : 'No service available'}</option>
-                )}
-              </select>
-            </div>
-          )}
-
           {isDigitalTechnologySupport && (
             <div className={styles.formGroup}>
               <label>Product Line</label>
               <select
                 value={formData.ProductLine || ''}
-                onChange={(e) => this.updateFormField('ProductLine', e.target.value)}
+                onChange={(e) => this.handleProductLineChange(e.target.value)}
               >
                 <option value="">Select Product Line</option>
                 {Array.isArray(choiceOptions.ProductLine) && choiceOptions.ProductLine.length > 0 ? (
@@ -508,6 +559,34 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
               </select>
             </div>
           )}
+
+          <div className={styles.formGroup}>
+            <label>Service</label>
+            <select
+              value={formData.Service || ''}
+              onChange={(e) => this.updateFormField('Service', e.target.value)}
+              disabled={
+                isDepartmentServicesLoading ||
+                !formData.Department ||
+                (isDigitalTechnologySupport && !formData.ProductLine)
+              }
+            >
+              <option value="">Select Service</option>
+              {departmentServices.length > 0 ? (
+                departmentServices.map(service => (
+                  <option key={service} value={service}>{service}</option>
+                ))
+              ) : (
+                <option disabled>
+                  {isDepartmentServicesLoading
+                    ? 'Loading options...'
+                    : (isDigitalTechnologySupport && !formData.ProductLine
+                      ? 'Please select Product Line first'
+                      : 'No service available')}
+                </option>
+              )}
+            </select>
+          </div>
 
           <div className={styles.formGroup}>
             <label>Timeline</label>

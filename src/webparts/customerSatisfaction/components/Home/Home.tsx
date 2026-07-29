@@ -24,7 +24,7 @@ export default class Home extends React.Component<IHomeProps, IHomeState> {
         
         <div className={styles.heroImageContainer}>
           <img 
-            src={require('../../assets/hero-image.png')}
+            src={require('../../assets/cover.jpg')}
             alt="CSP Hero"
             className={styles.heroImage}
             onError={(e) => {

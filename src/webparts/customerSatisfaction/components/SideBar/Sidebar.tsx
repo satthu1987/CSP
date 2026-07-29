@@ -2,10 +2,27 @@ import * as React from 'react';
 import styles from './Sidebar.module.scss';
 import { Icon, TooltipHost } from '@fluentui/react';
 
-export type ViewName = 'home' | 'about' | 'actionplan' | 'dashboard' | 'admin' | 'company' | 'iss' | 'is' | 'ss' | 'dts';
+export type ViewName =
+  'home'
+  | 'about'
+  | 'actionplan'
+  | 'dashboard'
+  | 'admin'
+  | 'company'
+  | 'iss'
+  | 'is'
+  | 'ss'
+  | 'dts'
+  | 'serviceResult'
+  | 'dtsComponentManufacturing'
+  | 'dtsEngineeringTechnology'
+  | 'dtsEnterpriseApplications'
+  | 'dtsESTechnology'
+  | 'dtsResidential';
 
 export interface ISidebarProps {
   isTeamLeader: boolean;
+  userRole: 'visitor' | 'leader' | 'manager' | 'admin';
   isSidebarCollapsed: boolean;
   currentView: ViewName;
   onToggleSidebar: () => void;
@@ -72,6 +89,7 @@ export default class Sidebar extends React.Component<ISidebarProps, ISidebarStat
           onClick={() => {
             if (submenuItems && !isSidebarCollapsed) {
               this.toggleSubmenu(label);
+              onNavigate(view);
             } else if (submenuItems && isSidebarCollapsed) {
               // When collapsed, navigate directly
               onNavigate(view);
@@ -132,7 +150,7 @@ export default class Sidebar extends React.Component<ISidebarProps, ISidebarStat
   };
 
   public render(): JSX.Element {
-    const { isSidebarCollapsed, isTeamLeader, onToggleSidebar } = this.props;
+    const { isSidebarCollapsed, userRole, onToggleSidebar } = this.props;
 
     return (
       <aside className={`${styles.sidebar} ${isSidebarCollapsed ? styles.collapsed : ''}`}>
@@ -152,33 +170,45 @@ export default class Sidebar extends React.Component<ISidebarProps, ISidebarStat
         </button>
 
         <nav className={styles.nav}>
+          {/* Home section - shown to all */}
           <div className={styles.navGroup}>
             {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Home</div>}
             {this.renderNavItem('Home', 'Home', 'home')}
             {this.renderNavItem('Info', 'Learn More', 'about')}
           </div>
+
+          {/* Results section - shown to all */}
           <div className={styles.navGroup}>
             {!isSidebarCollapsed && <div className={styles.navGroupTitle}>RESULTS</div>}
-            {this.renderNavItem('Home', 'Company', 'company')}
-            {this.renderNavItemWithSubmenu('Info', 'ISS', 'iss', [
-              { label: 'IS', view: 'is' },
-              { label: 'SS', view: 'ss' }
+            {this.renderNavItem('Home', 'ESVN', 'company')}
+            {this.renderNavItemWithSubmenu('Info', 'Internal & Sales Support', 'iss', [
+              { label: 'Internal Support', view: 'is' },
+              { label: 'Sales Support', view: 'ss' }
             ])}
-            {this.renderNavItem('Info', 'DTS', 'dts')}
+            {this.renderNavItemWithSubmenu('Info', 'Digital Technology Support', 'dts', [
+              { label: 'Component Manufacturing', view: 'dtsComponentManufacturing' },
+              { label: 'Engineering Technology', view: 'dtsEngineeringTechnology' },
+              { label: 'Enterprise Applications', view: 'dtsEnterpriseApplications' },
+              { label: 'ES Technology', view: 'dtsESTechnology' },
+              { label: 'Residential', view: 'dtsResidential' }
+            ])}
           </div>
 
-          {isTeamLeader && (
-            <>
-              <div className={styles.navGroup}>
-                {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Comment & Action Plan</div>}
-                {this.renderNavItem('Edit', 'Action Plan', 'actionplan')}
-              </div>
-              <div className={styles.navGroup}>
-                {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Administration</div>}
-                {this.renderNavItem('ViewDashboard', 'Dashboard', 'dashboard')}
-                {this.renderNavItem('Admin', 'Role Management', 'admin')}
-              </div>
-            </>
+          {/* Comment & Action Plan - shown to leader, manager and admin */}
+          {(userRole === 'leader' || userRole === 'manager' || userRole === 'admin') && (
+            <div className={styles.navGroup}>
+              {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Comment & Action Plan</div>}
+              {this.renderNavItem('Edit', 'Action Plan', 'actionplan')}
+            </div>
+          )}
+
+          {/* Administration - shown to admin only */}
+          {userRole === 'admin' && (
+            <div className={styles.navGroup}>
+              {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Administration</div>}
+              {this.renderNavItem('ViewDashboard', 'Dashboard', 'dashboard')}
+              {this.renderNavItem('Admin', 'Role Management', 'admin')}
+            </div>
           )}
         </nav>
 

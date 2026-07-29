@@ -114,7 +114,7 @@ export class ActionPlanService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items(${id})` +
-        `?$select=Id,Title,Service,CustomerFeedback,UpdatedFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
+        `?$select=Id,Title,Service,CustomerFeedback,UpdatedFeedback,Actions,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
         `&$expand=PIC`;
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.get(
@@ -312,6 +312,36 @@ export class ActionPlanService {
    }
 
   /**
+   * Gets all action plans (no filter - for admin use).
+   */
+  public async getAllActionPlans(): Promise<IActionplan[]> {
+    try {
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items` +
+        `?$select=Id,Title,Service,UpdatedFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
+        `&$expand=PIC` +
+        `&$orderby=Timeline desc`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch all action plans');
+        return [];
+      }
+
+      const data = await response.json();
+      return Array.isArray(data.value) ? (data.value as IActionplan[]) : [];
+    } catch (error) {
+      console.error('ActionPlanService getAllActionPlans error:', error);
+      return [];
+    }
+  }
+
+  /**
    * Gets all action plans filtered by department.
    */
   public async getActionPlansByDepartment(department: string): Promise<IActionplan[]> {
@@ -319,7 +349,7 @@ export class ActionPlanService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Title,Service,PICId,PIC/EMail,PIC/Title,Timeline,Status,Department` +
+        `?$select=Id,Title,Service,PICId,PIC/EMail,PIC/Title,Timeline,Status,Department,Year` +
         `&$expand=PIC` +
         `&$filter=Department eq '${department.replace(/'/g, "''")}'` +
         `&$orderby=Timeline desc`;
