@@ -9,10 +9,13 @@ export interface IUserDirectoryEntry {
   email: string;
 }
 
-export interface IActionPlanUpsert extends Partial<Omit<IActionplan, 'UpdatedFeedback' | 'Actions' | 'Results' | 'PICId'>> {
+type IMultiChoicePayload = { results: string[] };
+
+export interface IActionPlanUpsert extends Partial<Omit<IActionplan, 'UpdatedFeedback' | 'Actions' | 'Results' | 'PICId' | 'Category'>> {
   UpdatedFeedback?: string;
   Actions?: string[] | string;
   Results?: string[] | string;
+  Category?: string[] | string | IMultiChoicePayload;
   PICId?: number;
 }
 
@@ -29,6 +32,31 @@ export class ActionPlanService {
   private context: WebPartContext;
   private listName: string;
 
+  private normalizeCategoryValues(category: IActionPlanUpsert['Category']): string[] {
+    if (!category) {
+      return [];
+    }
+
+    if (Array.isArray(category)) {
+      return category
+        .map(value => (value || '').trim())
+        .filter(value => Boolean(value));
+    }
+
+    if (typeof category === 'string') {
+      const trimmed = category.trim();
+      return trimmed ? [trimmed] : [];
+    }
+
+    if (Array.isArray(category.results)) {
+      return category.results
+        .map(value => (value || '').trim())
+        .filter(value => Boolean(value));
+    }
+
+    return [];
+  }
+
   constructor(context: WebPartContext, listName: string) {
     this.context = context;
     this.listName = listName;
@@ -42,7 +70,7 @@ export class ActionPlanService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Title,Service,UpdatedFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
+        `?$select=Id,Title,Service,CustomerFeedback,UpdatedFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
         `&$expand=PIC` +
         `&$filter=Service eq '${service}'` +
         `&$orderby=Timeline desc`;
@@ -83,7 +111,7 @@ export class ActionPlanService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Title,Service,UpdatedFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
+        `?$select=Id,Title,Service,CustomerFeedback,UpdatedFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
         `&$expand=PIC` +
         `&$filter=${filters}` +
         `&$orderby=Timeline desc`;
@@ -319,7 +347,7 @@ export class ActionPlanService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Title,Service,UpdatedFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
+        `?$select=Id,Title,Service,CustomerFeedback,UpdatedFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
         `&$expand=PIC` +
         `&$orderby=Timeline desc`;
 
@@ -349,7 +377,7 @@ export class ActionPlanService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Title,Service,PICId,PIC/EMail,PIC/Title,Timeline,Status,Department,Year` +
+        `?$select=Id,Title,CustomerFeedback,UpdatedFeedback,Service,PICId,PIC/EMail,PIC/Title,Timeline,Status,Department,Year` +
         `&$expand=PIC` +
         `&$filter=Department eq '${department.replace(/'/g, "''")}'` +
         `&$orderby=Timeline desc`;
@@ -373,13 +401,58 @@ export class ActionPlanService {
   }
 
    private buildActionPlanPayload(actionplan: IActionPlanUpsert): IActionPlanUpsert {
-     const payload: IActionPlanUpsert = { ...actionplan };
+     // Build payload from an explicit allow-list to avoid sending SharePoint annotation fields.
+     const payload: IActionPlanUpsert = {};
 
-     // Remove complex objects that shouldn't be sent to SharePoint REST API
-     delete payload.PIC;
-     
-     // Ensure PICId is explicitly set
-     if (actionplan.PICId) {
+     if (actionplan.Title !== undefined) {
+       payload.Title = actionplan.Title;
+     }
+     if (actionplan.Service !== undefined) {
+       payload.Service = actionplan.Service;
+     }
+     if (actionplan.CustomerFeedback !== undefined) {
+       payload.CustomerFeedback = actionplan.CustomerFeedback;
+     }
+     if (actionplan.UpdatedFeedback !== undefined) {
+       payload.UpdatedFeedback = actionplan.UpdatedFeedback;
+     }
+     if (actionplan.Actions !== undefined) {
+       payload.Actions = Array.isArray(actionplan.Actions) ? actionplan.Actions.join('\n') : actionplan.Actions;
+     }
+     if (actionplan.Timeline !== undefined) {
+       payload.Timeline = actionplan.Timeline;
+     }
+     if (actionplan.Status !== undefined) {
+       payload.Status = actionplan.Status;
+     }
+     if (actionplan.Results !== undefined) {
+       payload.Results = Array.isArray(actionplan.Results) ? actionplan.Results.join('\n') : actionplan.Results;
+     }
+     if (actionplan.RelatedLinks !== undefined) {
+       payload.RelatedLinks = actionplan.RelatedLinks;
+     }
+     if (actionplan.Year !== undefined) {
+       payload.Year = actionplan.Year;
+     }
+     if (actionplan.Category !== undefined) {
+       const categoryValues = this.normalizeCategoryValues(actionplan.Category);
+       if (categoryValues.length > 0) {
+         // Multi-choice field expects a JSON array in this API mode.
+         payload.Category = categoryValues;
+       }
+     }
+     if (actionplan.ProductLine !== undefined) {
+       payload.ProductLine = actionplan.ProductLine;
+     }
+     if (actionplan.Department !== undefined) {
+       payload.Department = actionplan.Department;
+     }
+     if (actionplan.Division !== undefined) {
+       payload.Division = actionplan.Division;
+     }
+
+     // For Person field updates, only send lookup ID.
+     if (typeof actionplan.PICId === 'number') {
        payload.PICId = actionplan.PICId;
      }
 

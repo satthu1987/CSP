@@ -97,34 +97,21 @@ export default class CustomerSatisfaction
   }
 
   private renderActionPlan(): JSX.Element {
-    const { userRole, userService } = this.state;
+    const { userRole } = this.state;
 
     if (userRole === 'admin') {
       return <ActionPlan context={this.props.context} userService="" filterMode="admin" />;
     }
 
     if (userRole === 'manager') {
-      return <ActionPlan context={this.props.context} userService={userService} filterMode="manager" />;
+      return <ActionPlan context={this.props.context} userService="" filterMode="manager" />;
     }
 
-    // leader
-    if (!userService) {
-      return (
-        <main className={styles.mainPlain}>
-          <div className={styles.pageBreadcrumb}>Home › <strong>Action Plan</strong></div>
-          <div style={{ padding: 40 }}>
-            <h2>Action Plan</h2>
-            <p>Service information not available.</p>
-          </div>
-        </main>
-      );
-    }
-
-    return <ActionPlan context={this.props.context} userService={userService} filterMode="leader" />;
+    return <ActionPlan context={this.props.context} userService="" filterMode="leader" />;
   }
 
   private renderCompany(): JSX.Element {
-    return <Results context={this.props.context} department="Company" />;
+    return <Results context={this.props.context} department="ESVN" />;
   }
 
   private renderISS(): JSX.Element {
@@ -262,7 +249,7 @@ export default class CustomerSatisfaction
       case 'about':      return this.renderAbout();
       case 'actionplan': return this.renderActionPlan();
       case 'dashboard':  return this.renderDashboard();
-      case 'company':    return this.renderCompany();
+      case 'esvn':    return this.renderCompany();
       case 'iss':        return this.renderISS();
       case 'is':         return this.renderIS();
       case 'ss':         return this.renderSS();

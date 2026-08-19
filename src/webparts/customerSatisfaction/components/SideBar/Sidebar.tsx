@@ -8,7 +8,7 @@ export type ViewName =
   | 'actionplan'
   | 'dashboard'
   | 'admin'
-  | 'company'
+  | 'esvn'
   | 'iss'
   | 'is'
   | 'ss'
@@ -180,12 +180,12 @@ export default class Sidebar extends React.Component<ISidebarProps, ISidebarStat
           {/* Results section - shown to all */}
           <div className={styles.navGroup}>
             {!isSidebarCollapsed && <div className={styles.navGroupTitle}>RESULTS</div>}
-            {this.renderNavItem('Home', 'ESVN', 'company')}
-            {this.renderNavItemWithSubmenu('Info', 'Internal & Sales Support', 'iss', [
+            {this.renderNavItem('CompanyDirectory', 'ESVN', 'esvn')}
+            {this.renderNavItemWithSubmenu('BusinessCenterLogo', 'Internal & Sales Support', 'iss', [
               { label: 'Internal Support', view: 'is' },
               { label: 'Sales Support', view: 'ss' }
             ])}
-            {this.renderNavItemWithSubmenu('Info', 'Digital Technology Support', 'dts', [
+            {this.renderNavItemWithSubmenu('CloudImportExport', 'Digital Technology Support', 'dts', [
               { label: 'Component Manufacturing', view: 'dtsComponentManufacturing' },
               { label: 'Engineering Technology', view: 'dtsEngineeringTechnology' },
               { label: 'Enterprise Applications', view: 'dtsEnterpriseApplications' },
@@ -198,7 +198,7 @@ export default class Sidebar extends React.Component<ISidebarProps, ISidebarStat
           {(userRole === 'leader' || userRole === 'manager' || userRole === 'admin') && (
             <div className={styles.navGroup}>
               {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Comment & Action Plan</div>}
-              {this.renderNavItem('Edit', 'Action Plan', 'actionplan')}
+              {this.renderNavItem('ScheduleEventAction', 'Action Plan', 'actionplan')}
             </div>
           )}
 
@@ -206,8 +206,8 @@ export default class Sidebar extends React.Component<ISidebarProps, ISidebarStat
           {userRole === 'admin' && (
             <div className={styles.navGroup}>
               {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Administration</div>}
-              {this.renderNavItem('ViewDashboard', 'Dashboard', 'dashboard')}
-              {this.renderNavItem('Admin', 'Role Management', 'admin')}
+              {/* {this.renderNavItem('ViewDashboard', 'Dashboard', 'dashboard')} */}
+              {this.renderNavItem('WorkforceManagement', 'Role Management', 'admin')}
             </div>
           )}
         </nav>

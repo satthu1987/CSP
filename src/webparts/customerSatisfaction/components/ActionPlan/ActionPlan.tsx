@@ -17,8 +17,8 @@ export interface IActionPlanProps {
   /**
    * Controls how action plans are loaded:
    * - 'admin': loads all action plans (no filter)
-   * - 'leader': loads plans by PIC from RoleInService list
-   * - 'manager': loads plans by Manager from RoleInService list
+  * - 'leader': loads plans by services where current user is PIC in Division_Service list
+  * - 'manager': loads plans by services where current user is Manager in Division_Service list
    * Defaults to 'leader' behaviour if omitted.
    */
   filterMode?: 'admin' | 'leader' | 'manager';
@@ -88,10 +88,22 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
     ]);
   }
 
+  private getCurrentUserEmail(): string {
+    const user = this.props.context.pageContext.user;
+    const rawEmail = (user && user.email ? user.email : '').trim();
+    if (rawEmail) {
+      return rawEmail;
+    }
+
+    const loginName = (user && user.loginName ? user.loginName : '').trim();
+    const claimParts = loginName.split('|');
+    return claimParts.length > 0 ? (claimParts[claimParts.length - 1] || '').trim() : loginName;
+  }
+
   private loadUserServices = async (): Promise<void> => {
     this.setState({ isLoadingUserServices: true });
     try {
-      const userEmail = this.props.context.pageContext.user.loginName;
+      const userEmail = this.getCurrentUserEmail();
       const { filterMode } = this.props;
       let userServices: string[] = [];
 
@@ -123,7 +135,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
       } else if (userServices.length === 1) {
         actionPlans = await this.actionPlanService.getActionPlansByService(userServices[0]);
       } else {
-        actionPlans = await this.actionPlanService.getActionPlansByService(this.props.userService);
+        actionPlans = [];
       }
 
       this.setState({ actionPlans, isLoading: false });
@@ -144,7 +156,13 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
        selectedActionPlan: actionPlan,
        isDetailPanelOpen: true,
        isNewMode: false,
-       formData: { ...actionPlan, PICId: actionPlan.PICId }
+       formData: {
+         ...actionPlan,
+         PICId: actionPlan.PICId,
+         Category: Array.isArray(actionPlan.Category)
+           ? actionPlan.Category
+           : (actionPlan.Category ? [actionPlan.Category] : [])
+       }
      });
 
      const serviceLookupDivision = isDigitalTechnologySupport
@@ -258,12 +276,18 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
 
   private handleSave = async (): Promise<void> => {
     const { isNewMode, formData } = this.state;
+    const selectedCategories = this.getSelectedCategories();
     
     // Ensure PICId is included
     const payload: IActionPlanUpsert = {
       ...formData,
-      PICId: formData.PICId
+      PICId: formData.PICId,
+      Category: selectedCategories
     };
+
+    if (selectedCategories.length === 0) {
+      delete payload.Category;
+    }
 
     console.log('Saving ActionPlan:', { isNewMode, payload });
 
@@ -307,7 +331,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
     const { actionPlans, filterTitle, filterService, filterPIC, filterStatus, filterYear } = this.state;
     
     return actionPlans.filter(plan => {
-      const titleMatch = (plan.Title || '').toLowerCase().indexOf(filterTitle.toLowerCase()) > -1;
+      const titleMatch = (plan.CustomerFeedback || '').toLowerCase().indexOf(filterTitle.toLowerCase()) > -1;
       const serviceMatch = filterService === '' || (plan.Service || '').toLowerCase() === filterService.toLowerCase();
       const picMatch = (plan.PIC?.Title || '').toLowerCase().indexOf(filterPIC.toLowerCase()) > -1;
       const statusMatch = filterStatus === '' || (plan.Status || '').toLowerCase() === filterStatus.toLowerCase();
@@ -317,19 +341,112 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
     });
   }
 
+  private getServiceFilterOptions(): string[] {
+    const { actionPlans, choiceOptions, userServices } = this.state;
+    const serviceMap: { [key: string]: boolean } = {};
+    const options: string[] = [];
+
+    actionPlans.forEach(plan => {
+      const service = (plan.Service || '').trim();
+      if (service && !serviceMap[service]) {
+        serviceMap[service] = true;
+        options.push(service);
+      }
+    });
+
+    if (options.length === 0) {
+      userServices.forEach(service => {
+        const value = (service || '').trim();
+        if (value && !serviceMap[value]) {
+          serviceMap[value] = true;
+          options.push(value);
+        }
+      });
+    }
+
+    if (options.length === 0 && Array.isArray(choiceOptions.Service)) {
+      choiceOptions.Service.forEach(service => {
+        const value = (service || '').trim();
+        if (value && !serviceMap[value]) {
+          serviceMap[value] = true;
+          options.push(value);
+        }
+      });
+    }
+
+    options.sort();
+    return options;
+  }
+
+  private getSelectedCategories(): string[] {
+    const categoryValue = this.state.formData.Category;
+
+    if (Array.isArray(categoryValue)) {
+      return categoryValue;
+    }
+
+    if (typeof categoryValue === 'string' && categoryValue.trim()) {
+      return [categoryValue.trim()];
+    }
+
+    return [];
+  }
+
+  private toggleCategoryChoice(choice: string): void {
+    const selectedCategories = this.getSelectedCategories().slice();
+    const selectedIndex = selectedCategories.indexOf(choice);
+
+    if (selectedIndex >= 0) {
+      selectedCategories.splice(selectedIndex, 1);
+    } else {
+      selectedCategories.push(choice);
+    }
+
+    this.updateFormField('Category', selectedCategories);
+  }
+
   private getYearOptions(): string[] {
     const currentYear = new Date().getFullYear();
     const years: string[] = [];
-    for (let i = -3; i <= 3; i++) {
+    for (let i = -3; i <= 0; i++) {
       years.push((currentYear + i).toString());
     }
     return years;
+  }
+
+  private htmlToPlainText(value: string | undefined): string {
+    if (!value) {
+      return '';
+    }
+
+    const htmlWithLineBreaks = value.replace(/<\s*br\s*\/?>/gi, '\n');
+    const temp = document.createElement('div');
+    temp.innerHTML = htmlWithLineBreaks;
+
+    const plainText = (temp.textContent || temp.innerText || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return plainText;
+  }
+
+  private getGridPreviewText(value: string | undefined, maxLength: number = 50): string {
+    const plainText = this.htmlToPlainText(value);
+    if (!plainText) {
+      return '-';
+    }
+
+    return plainText.length > maxLength
+      ? `${plainText.substring(0, maxLength)}...`
+      : plainText;
   }
 
   private renderGrid(): JSX.Element {
     const { actionPlans, isLoading, filterTitle, filterService, filterPIC, filterStatus, filterYear, choiceOptions } = this.state;
     const filteredPlans = this.getFilteredActionPlans();
     const statusOptions = Array.isArray(choiceOptions.Status) ? choiceOptions.Status : [];
+    const serviceOptions = this.getServiceFilterOptions();
     
     // Build unique PIC list without Array.from for ES5 compatibility
     const picSet: { [key: string]: boolean } = {};
@@ -353,10 +470,10 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
           <>
             <div className={styles.filterSection}>
               <div className={styles.filterGroup}>
-                <label>Title</label>
+                <label>Customer Feedback</label>
                 <input
                   type="text"
-                  placeholder="Search by title..."
+                  placeholder="Search by Customer Feedback..."
                   value={filterTitle}
                   onChange={(e) => this.setState({ filterTitle: e.target.value })}
                   className={styles.filterInput}
@@ -413,8 +530,8 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
                   className={styles.filterSelect}
                 >
                   <option value="">All Services</option>
-                  {Array.isArray(this.state.userServices) && this.state.userServices.length > 0 ? (
-                    this.state.userServices.map(service => (
+                  {serviceOptions.length > 0 ? (
+                    serviceOptions.map(service => (
                       <option key={service} value={service}>{service}</option>
                     ))
                   ) : (
@@ -432,11 +549,13 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
             </div>
 
             <div className={styles.gridHeader}>
-              <div className={styles.colTitle}>Title</div>
+              <div className={styles.colTitle}>Original Customer Feedback</div>
               <div className={styles.colDepartment}>Department</div>
               <div className={styles.colService}>Service</div>
               <div className={styles.colProductLine}>Product Line</div>
               <div className={styles.colUpdatedFeedback}>Customer Feedback</div>
+              <div className={styles.colResult}>Result</div>
+              <div className={styles.colRelatedLinks}>Related Links</div>
               <div className={styles.colStatus}>Status</div>
               <div className={styles.colAction}>Action</div>
             </div>
@@ -450,12 +569,20 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
                   key={plan.Id}
                   className={styles.gridRow}
                 >
-                  <div className={styles.colTitle}>{plan.Title}</div>
+                  <div className={styles.colTitle}>
+                    {this.getGridPreviewText(plan.CustomerFeedback)}
+                  </div>
                   <div className={styles.colDepartment}>{plan.Department || '-'}</div>
                   <div className={styles.colService}>{plan.Service || '-'}</div>
                   <div className={styles.colProductLine}>{plan.ProductLine || '-'}</div>
                   <div className={styles.colUpdatedFeedback}>
-                    {plan.CustomerFeedback ? plan.CustomerFeedback.substring(0, 50) + (plan.CustomerFeedback.length > 50 ? '...' : '') : '-'}
+                    {this.getGridPreviewText(plan.UpdatedFeedback)}
+                  </div>
+                  <div className={styles.colResult}>
+                    {this.getGridPreviewText(Array.isArray(plan.Results) ? plan.Results.join('\n') : (plan.Results as unknown as string))}
+                  </div>
+                  <div className={styles.colRelatedLinks}>
+                    {this.getGridPreviewText(plan.RelatedLinks)}
                   </div>
                   <div className={styles.colStatus}>
                     <span className={`${styles.badge} ${this.getStatusClassName(plan.Status)}`}>
@@ -514,7 +641,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
           </div>
 
         <div className={styles.panelBody}>
-          <div className={styles.formGroup}>
+          {/* <div className={styles.formGroup}>
             <label>Title</label>
             <input
               type="text"
@@ -522,7 +649,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
               onChange={(e) => this.updateFormField('Title', e.target.value)}
               placeholder="Enter title"
             />
-          </div>
+          </div> */}
 
           <div className={styles.formGroup}>
             <label>Department</label>
@@ -674,19 +801,22 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
 
           <div className={styles.formGroup}>
             <label>Category</label>
-            <select
-              value={formData.Category || ''}
-              onChange={(e) => this.updateFormField('Category', e.target.value)}
-            >
-              <option value="">Select Category</option>
+            <div className={styles.multiChoiceBox}>
               {Array.isArray(choiceOptions.Category) && choiceOptions.Category.length > 0 ? (
                 choiceOptions.Category.map(choice => (
-                  <option key={choice} value={choice}>{choice}</option>
+                  <label key={choice} className={styles.multiChoiceItem}>
+                    <input
+                      type="checkbox"
+                      checked={this.getSelectedCategories().indexOf(choice) >= 0}
+                      onChange={() => this.toggleCategoryChoice(choice)}
+                    />
+                    <span>{choice}</span>
+                  </label>
                 ))
               ) : (
-                <option>Loading options...</option>
+                <div className={styles.fieldHint}>Loading options...</div>
               )}
-            </select>
+            </div>
           </div>
 
           <div className={styles.formGroup}>

@@ -36,7 +36,7 @@ export default class Home extends React.Component<IHomeProps, IHomeState> {
 
         <div className={styles.timelineImageContainer}>
           <img 
-            src={require('../../assets/csp_timeline.jpg')}
+            src={require('../../assets/csp_timeline.png')}
             alt="CSP Timeline"
             className={styles.timelineImage}
             onError={(e) => {

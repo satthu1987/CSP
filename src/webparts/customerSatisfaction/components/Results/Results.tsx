@@ -147,9 +147,6 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
       (yearNum - 2).toString(),
       (yearNum - 1).toString(),
       yearNum.toString(),
-      (yearNum + 1).toString(),
-      (yearNum + 2).toString(),
-      (yearNum + 3).toString(),
     ];
   }
 
@@ -173,6 +170,32 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
       case 'closed': return styles.statusClosed;
       default: return styles.statusOpen;
     }
+  }
+  private htmlToPlainText(value: string | undefined): string {
+    if (!value) {
+      return '';
+    }
+
+    const htmlWithLineBreaks = value.replace(/<\s*br\s*\/?>/gi, '\n');
+    const temp = document.createElement('div');
+    temp.innerHTML = htmlWithLineBreaks;
+
+    const plainText = (temp.textContent || temp.innerText || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return plainText;
+  }
+    private getGridPreviewText(value: string | undefined, maxLength: number = 50): string {
+    const plainText = this.htmlToPlainText(value);
+    if (!plainText) {
+      return '-';
+    }
+
+    return plainText.length > maxLength
+      ? `${plainText.substring(0, maxLength)}...`
+      : plainText;
   }
 
   private renderActionPlanGrid(): JSX.Element {
@@ -202,7 +225,7 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
             </div>
             {actionPlans.map(plan => (
               <div key={plan.Id} className={styles.planRow}>
-                <div className={styles.colTitle}>{plan.CustomerFeedback || '—'}</div>
+                <div className={styles.colTitle}>{this.getGridPreviewText(plan.UpdatedFeedback) || '—'}</div>
                 <div className={styles.colService}>{plan.Actions || '—'}</div>
                 <div className={styles.colPIC}>{plan.PIC?.Title || '—'}</div>
                 <div className={styles.colTimeline}>{this.formatDate(plan.Timeline)}</div>

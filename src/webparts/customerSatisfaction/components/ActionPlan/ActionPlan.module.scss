@@ -155,7 +155,7 @@
 
 .gridHeader {
   display: grid;
-  grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr 2fr 1fr 0.8fr;
+  grid-template-columns: 1.7fr 1fr 1fr 1fr 1.7fr 1.4fr 1.4fr 0.9fr 0.7fr;
   gap: 16px;
   padding: 16px;
   background: #f5f5f5;
@@ -167,7 +167,7 @@
 
 .gridRow {
   display: grid;
-  grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr 2fr 1fr 0.8fr;
+  grid-template-columns: 1.7fr 1fr 1fr 1fr 1.7fr 1.4fr 1.4fr 0.9fr 0.7fr;
   gap: 16px;
   padding: 16px;
   border-bottom: 1px solid #e0e0e0;
@@ -204,6 +204,22 @@
 }
 
 .colUpdatedFeedback {
+  color: #666;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.colResult {
+  color: #666;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.colRelatedLinks {
   color: #666;
   font-size: 14px;
   overflow: hidden;
@@ -401,6 +417,39 @@
   color: #666;
 }
 
+.multiChoiceBox {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  background: #fff;
+  padding: 6px 0;
+}
+
+.multiChoiceItem {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  margin: 0 !important;
+  padding: 8px 10px;
+  text-transform: none !important;
+  cursor: pointer;
+
+  &:hover {
+    background: #fff3ec;
+  }
+
+  input {
+    margin: 0;
+  }
+
+  span {
+    font-size: 14px;
+    color: #333;
+    font-weight: 500;
+  }
+}
+
 .panelFooter {
   display: flex;
   gap: 8px;
@@ -442,10 +491,18 @@
 @media (max-width: 1024px) {
   .gridHeader,
   .gridRow {
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
   }
 
   .colPIC {
+    display: none;
+  }
+
+  .colRelatedLinks,
+  .colResult,
+  .colProductLine,
+  .colUpdatedFeedback,
+  .colDepartment {
     display: none;
   }
 

@@ -15,7 +15,7 @@ export interface IActionplan {
   Results: string[];
   RelatedLinks: string;
   Year: string;
-  Category: string;
+  Category: string[] | string;
   ProductLine: string;
   Department: string;
   Division: string;

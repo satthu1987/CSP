@@ -77,7 +77,7 @@
 
 .gridHeader {
   display: grid;
-  grid-template-columns: 0.5fr 2fr 2fr 0.5fr;
+  grid-template-columns: 0.5fr 1.5fr 1fr 2.5fr 0.75fr;
   gap: 16px;
   padding: 14px 16px;
   background: #f5f5f5;
@@ -89,7 +89,7 @@
 
 .gridRow {
   display: grid;
-  grid-template-columns: 0.5fr 2fr 2fr 0.5fr;
+  grid-template-columns: 0.5fr 1.5fr 1fr 2.5fr 0.75fr;
   gap: 16px;
   padding: 14px 16px;
   border-bottom: 1px solid #e0e0e0;
@@ -124,6 +124,33 @@
 .colAction {
   display: flex;
   justify-content: center;
+}
+
+.colScope {
+  color: #555;
+  font-size: 14px;
+}
+
+.scopeList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scopeTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #fff3ec;
+  color: #c4471c;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.scopeEmpty {
+  color: #999;
 }
 
 .editIcon {
@@ -226,6 +253,63 @@
       color: #aaa;
     }
   }
+
+  select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    font-size: 14px;
+    box-sizing: border-box;
+    background: #fff;
+
+    &:focus {
+      outline: none;
+      border-color: #ff5722;
+      box-shadow: 0 0 0 2px rgba(255, 87, 34, 0.1);
+    }
+  }
+}
+
+.assignmentBox {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  background: #fff;
+  padding: 8px 0;
+}
+
+.assignmentItem {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 0 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #333 !important;
+  cursor: pointer;
+
+  &:hover {
+    background: #fff3ec;
+  }
+
+  input {
+    margin: 0;
+  }
+
+  span {
+    flex: 1;
+  }
+}
+
+.assignmentEmpty {
+  padding: 12px;
+  color: #777;
+  font-size: 14px;
 }
 
 .panelFooter {
