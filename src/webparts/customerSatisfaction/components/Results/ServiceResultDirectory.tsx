@@ -10,10 +10,11 @@ export interface IServiceResultDirectoryProps {
   resultDepartment: string;
   divisions: string[];
   getResultDepartmentByDivision?: (division: string) => string;
-  onShowResult: (department: string, service: string, label: string) => void;
+  onShowResult: (department: string, service: string | string[], label: string) => void;
 }
 
 interface IServiceResultDirectoryItem {
+  Id?: number;
   Division: string;
   Service: string;
 PIC?: string;
@@ -22,6 +23,7 @@ PIC?: string;
 interface IServiceResultDirectoryState {
   isLoading: boolean;
   items: IServiceResultDirectoryItem[];
+  loadingServiceKey?: string;
 }
 
 export default class ServiceResultDirectory extends React.Component<
@@ -59,9 +61,9 @@ export default class ServiceResultDirectory extends React.Component<
       const result: IServiceResultDirectoryItem[] = [];
 
       for (const division of divisions) {
-        const services = await this.divisionServiceService.getServicesByDivision(division);
+        const services = await this.divisionServiceService.getServicesWithIdByDivision(division);
         services.forEach(service => {
-          result.push({ Division: division, Service: service });
+          result.push({ Id: service.Id, Division: division, Service: service.Service, PIC: service.PIC });
         });
       }
 
@@ -72,9 +74,31 @@ export default class ServiceResultDirectory extends React.Component<
     }
   };
 
+  private handleShowResult = async (
+    rowDepartment: string,
+    item: IServiceResultDirectoryItem
+  ): Promise<void> => {
+    const key = `${item.Division}-${item.Service}`;
+    this.setState({ loadingServiceKey: key });
+
+    try {
+      const serviceNames = item.Id
+        ? await this.divisionServiceService.getServiceNameHistory(item.Id)
+        : [];
+
+      const services = serviceNames.length > 0 ? serviceNames : [item.Service];
+      this.props.onShowResult(rowDepartment, services, item.Service);
+    } catch (error) {
+      console.error('Failed to load service name history:', error);
+      this.props.onShowResult(rowDepartment, item.Service, item.Service);
+    } finally {
+      this.setState({ loadingServiceKey: undefined });
+    }
+  };
+
   public render(): JSX.Element {
-    const { title, resultDepartment, getResultDepartmentByDivision, onShowResult } = this.props;
-    const { isLoading, items } = this.state;
+    const { title, resultDepartment, getResultDepartmentByDivision } = this.props;
+    const { isLoading, items, loadingServiceKey } = this.state;
 
     return (
       <main className={styles.mainContainer}>
@@ -105,18 +129,25 @@ export default class ServiceResultDirectory extends React.Component<
                   const rowDepartment = getResultDepartmentByDivision
                     ? getResultDepartmentByDivision(item.Division)
                     : resultDepartment;
+                  const key = `${item.Division}-${item.Service}`;
+                  const isRowLoading = loadingServiceKey === key;
 
                   return (
-                    <div className={styles.gridRow} key={`${item.Division}-${item.Service}-${index}`}>
+                    <div className={styles.gridRow} key={`${key}-${index}`}>
                       <div>{item.Service}</div>
                       <div>{item.PIC}</div>
                       <div>
                         <button
                           type="button"
                           className={styles.actionLink}
-                          onClick={() => onShowResult(rowDepartment, item.Service, item.Service)}
+                          disabled={isRowLoading}
+                          onClick={() => {
+                            this.handleShowResult(rowDepartment, item).catch(error => {
+                              console.error('Error showing result:', error);
+                            });
+                          }}
                         >
-                          Show Result
+                          {isRowLoading ? 'Loading...' : 'Show Result'}
                         </button>
                       </div>
                     </div>

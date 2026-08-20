@@ -148,6 +148,95 @@ export class DivisionServiceService {
   }
 
   /**
+   * Gets services (with Id and PIC) for a given division. The Id is needed to
+   * subsequently look up the Service field's version history.
+   */
+  public async getServicesWithIdByDivision(division: string): Promise<Array<{ Id: number; Service: string; PIC?: string }>> {
+    if (!division) {
+      return [];
+    }
+
+    try {
+      const escapedDivision = this.escapeODataValue(division);
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items` +
+        `?$select=Id,Service,PIC/Title&$filter=Division eq '${escapedDivision}'&$orderby=Service asc&$expand=PIC`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch services with id by division:', response.status);
+        return [];
+      }
+
+      const data = await response.json();
+      const rows = Array.isArray(data.value)
+        ? (data.value as Array<{ Id: number; Service?: string; PIC?: { Title?: string } }>)
+        : [];
+
+      return rows
+        .filter(row => (row.Service || '').trim())
+        .map(row => ({
+          Id: row.Id,
+          Service: (row.Service || '').trim(),
+          PIC: row.PIC?.Title,
+        }));
+    } catch (error) {
+      console.error('DivisionServiceService getServicesWithIdByDivision error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Gets the distinct set of Service names (including the current value) this list
+   * item has ever had, based on the list's version history. Used so that when a
+   * Service is renamed, results/action plans filtered by the old and new names can
+   * both be surfaced.
+   */
+  public async getServiceNameHistory(itemId: number): Promise<string[]> {
+    if (!itemId) {
+      return [];
+    }
+
+    try {
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items(${itemId})/versions` +
+        `?$select=Service`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch service version history:', response.status);
+        return [];
+      }
+
+      const data = await response.json();
+      const rows = Array.isArray(data.value) ? (data.value as Array<{ Service?: string }>) : [];
+      const names: string[] = [];
+
+      rows.forEach(row => {
+        const name = (row.Service || '').trim();
+        if (name && names.indexOf(name) === -1) {
+          names.push(name);
+        }
+      });
+
+      return names;
+    } catch (error) {
+      console.error('DivisionServiceService getServiceNameHistory error:', error);
+      return [];
+    }
+  }
+
+  /**
    * Gets all service names from Division_Service where the user is the PIC.
    */
   public async getServicesByPIC(userEmail: string): Promise<string[]> {

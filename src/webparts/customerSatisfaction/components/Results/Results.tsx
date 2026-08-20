@@ -9,7 +9,7 @@ import { IActionplan } from '../../Models/ActionplanModel';
 export interface IResultsProps {
   context: WebPartContext;
   department: string; // "IS" | "SS" | "DTS" | "Company"
-  serviceFilter?: string;
+  serviceFilter?: string | string[];
   viewLabel?: string;
   hideActionPlan?: boolean; // When true, hides the Action Plans section
 }
@@ -57,7 +57,7 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
   public async componentDidUpdate(prevProps: IResultsProps): Promise<void> {
     if (
       prevProps.department !== this.props.department ||
-      prevProps.serviceFilter !== this.props.serviceFilter
+      JSON.stringify(prevProps.serviceFilter) !== JSON.stringify(this.props.serviceFilter)
     ) {
       const currentYear = new Date().getFullYear().toString();
       await this.loadData(this.props.department, currentYear);
@@ -80,8 +80,14 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
       ]);
 
       const serviceFilter = this.props.serviceFilter;
-      const filteredActionPlans = serviceFilter
-        ? allActionPlans.filter(item => (item.Service || '').toLowerCase() === serviceFilter.toLowerCase())
+      const serviceFilterList = Array.isArray(serviceFilter)
+        ? serviceFilter.filter(Boolean).map(name => name.toLowerCase())
+        : serviceFilter
+          ? [serviceFilter.toLowerCase()]
+          : [];
+
+      const filteredActionPlans = serviceFilterList.length > 0
+        ? allActionPlans.filter(item => serviceFilterList.indexOf((item.Service || '').toLowerCase()) > -1)
         : allActionPlans;
 
       this.setState({

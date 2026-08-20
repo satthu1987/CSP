@@ -26,6 +26,6 @@ export interface ICustomerSatisfactionState {
   currentView: ViewName;
   userService: string;
   selectedResultDepartment?: string;
-  selectedResultService?: string;
+  selectedResultService?: string | string[];
   selectedResultLabel?: string;
 }

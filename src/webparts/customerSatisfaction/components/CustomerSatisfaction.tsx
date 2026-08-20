@@ -65,7 +65,7 @@ export default class CustomerSatisfaction
     });
   };
 
-  private openServiceResult = (department: string, service: string, label: string): void => {
+  private openServiceResult = (department: string, service: string | string[], label: string): void => {
     this.setState({
       currentView: 'serviceResult',
       selectedResultDepartment: department,
