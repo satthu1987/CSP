@@ -120,7 +120,7 @@
 
 .planHeader {
   display: grid;
-  grid-template-columns: 2.5fr 1.5fr 1.5fr 1.2fr 1fr;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr 1fr 2fr 1fr;
   gap: 16px;
   padding: 14px 16px;
   background: #f5f5f5;
@@ -134,7 +134,7 @@
 
 .planRow {
   display: grid;
-  grid-template-columns: 2.5fr 1.5fr 1.5fr 1.2fr 1fr;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr 1fr 2fr 1fr;
   gap: 16px;
   padding: 14px 16px;
   border-bottom: 1px solid #f0f0f0;
@@ -172,6 +172,14 @@
 }
 
 .colStatus {
+  font-size: 13px;
+}
+
+.colResult {
+  font-size: 13px;
+}
+
+.colLink {
   font-size: 13px;
 }
 
@@ -251,11 +259,9 @@
   min-height: 300px;
 }
 
-.acImage {
+.acText {
+ max-width: 100%;
   object-fit: contain;
-  //width: 100%;
-  max-width: 100%;
-  height: auto;
 }
 
 @media (max-width: 768px) {

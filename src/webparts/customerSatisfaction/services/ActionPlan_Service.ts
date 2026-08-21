@@ -13,8 +13,8 @@ type IMultiChoicePayload = { results: string[] };
 
 export interface IActionPlanUpsert extends Partial<Omit<IActionplan, 'UpdatedFeedback' | 'Actions' | 'Results' | 'PICId' | 'Category'>> {
   UpdatedFeedback?: string;
-  Actions?: string[] | string;
-  Results?: string[] | string;
+  Actions?: string;
+  Results?: string;
   Category?: string[] | string | IMultiChoicePayload;
   PICId?: number;
 }
@@ -377,7 +377,7 @@ export class ActionPlanService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Title,CustomerFeedback,UpdatedFeedback,Service,PICId,PIC/EMail,PIC/Title,Timeline,Status,Department,Year` +
+        `?$select=Id,Title,CustomerFeedback,UpdatedFeedback,Service,PICId,PIC/EMail,PIC/Title,Timeline,Status,Actions,Results,RelatedLinks,Department,Year` +
         `&$expand=PIC` +
         `&$filter=Department eq '${department.replace(/'/g, "''")}'` +
         `&$orderby=Timeline desc`;

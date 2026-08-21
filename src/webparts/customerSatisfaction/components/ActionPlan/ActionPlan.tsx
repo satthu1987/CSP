@@ -651,6 +651,16 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
             />
           </div> */}
 
+
+          <div className={styles.formGroup}>
+            <label>Year</label>
+            <input
+              type="text"
+              value={formData.Year || ''}
+              onChange={(e) => this.updateFormField('Year', e.target.value)}
+              placeholder="Enter year"
+            />
+          </div>
           <div className={styles.formGroup}>
             <label>Department</label>
             <select
@@ -724,16 +734,8 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
             />
           </div>
 
-          <div className={styles.formGroup}>
-            <label>Customer Feedback</label>
-            <ReactQuill
-              theme="snow"
-              value={formData.CustomerFeedback || ''}
-              onChange={(content) => this.updateFormField('CustomerFeedback', content)}
-              placeholder="Enter customer feedback..."
-            />
-          </div>
-
+        {isNewMode ?
+          
           <div className={styles.formGroup}>
             <label>Updated Feedback</label>
             <ReactQuill
@@ -743,7 +745,26 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
               placeholder="Enter updated feedback..."
             />
           </div>
-
+:
+          (<><div className={styles.formGroup}>
+            <label>Customer Feedback</label>
+            <ReactQuill
+              theme="snow"
+              value={formData.CustomerFeedback || ''}
+              onChange={(content) => this.updateFormField('CustomerFeedback', content)}
+              placeholder="Enter customer feedback..."
+            />
+          </div>
+          <div className={styles.formGroup}>
+            <label>Updated Feedback</label>
+            <ReactQuill
+              theme="snow"
+              value={formData.UpdatedFeedback || ''}
+              onChange={(content) => this.updateFormField('UpdatedFeedback', content)}
+              placeholder="Enter updated feedback..."
+            />
+          </div></>)
+   }
           <div className={styles.formGroup}>
             <label>Action</label>
             <ReactQuill
@@ -836,15 +857,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
             </select>
           </div>
 
-          <div className={styles.formGroup}>
-            <label>Year</label>
-            <input
-              type="text"
-              value={formData.Year || ''}
-              onChange={(e) => this.updateFormField('Year', e.target.value)}
-              placeholder="Enter year"
-            />
-          </div>
+          
 
           <div className={styles.formGroup}>
             <label>Result</label>

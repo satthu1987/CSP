@@ -228,11 +228,13 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
               <div className={styles.colPIC}>PIC</div>
               <div className={styles.colTimeline}>Timeline</div>
               <div className={styles.colStatus}>Status</div>
+              <div className={styles.colResult}>Results</div>
+              <div className={styles.colLink}>Link</div>
             </div>
             {actionPlans.map(plan => (
               <div key={plan.Id} className={styles.planRow}>
                 <div className={styles.colTitle}>{this.getGridPreviewText(plan.UpdatedFeedback) || '—'}</div>
-                <div className={styles.colService}>{plan.Actions || '—'}</div>
+                <div className={styles.colService}>{this.getGridPreviewText(plan.Actions) || '—'}</div>
                 <div className={styles.colPIC}>{plan.PIC?.Title || '—'}</div>
                 <div className={styles.colTimeline}>{this.formatDate(plan.Timeline)}</div>
                 <div className={styles.colStatus}>
@@ -240,6 +242,8 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
                     {plan.Status || 'Open'}
                   </span>
                 </div>
+                <div className={styles.colResult}>{this.getGridPreviewText(plan.Results) || '—'}</div>
+                <div className={styles.colLink}>{this.getGridPreviewText(plan.RelatedLinks) || '—'}</div>
               </div>
             ))}
           </div>
@@ -271,17 +275,10 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
                 </div>
 
                 <div className={styles.acBody}>
-                  {item.DataUrl ? (
-                    <img
-                      src={item.DataUrl}
-                      alt={item.DataAlt}
-                      className={styles.acImage}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
+                  {item.Data ? (
+                    <div className={styles.acText}><img src={item.Data} /></div>
                   ) : (
-                    <div className={styles.emptyMessage}>No image available for {item.Year}.</div>
+                    <div className={styles.emptyMessage}>No data available for {item.Year}.</div>
                   )}
                 </div>
               </div>

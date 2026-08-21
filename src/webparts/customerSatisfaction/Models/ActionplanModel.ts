@@ -4,7 +4,7 @@ export interface IActionplan {
   Service: string;
   CustomerFeedback: string;
   UpdatedFeedback: string;
-  Actions: string[];
+  Actions: string;
   PIC?: {
     Title: string;
     EMail: string;
@@ -12,7 +12,7 @@ export interface IActionplan {
   PICId?: number;
   Timeline: string;
   Status: string;
-  Results: string[];
+  Results: string;
   RelatedLinks: string;
   Year: string;
   Category: string[] | string;
