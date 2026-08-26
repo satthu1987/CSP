@@ -15,7 +15,7 @@ export class DivisionServiceService {
     return value.replace(/'/g, "''");
   }
 
-  private async updateListItem(itemId: number, payload: Partial<{ PICId: number | null; ManagerId: number | null }>): Promise<boolean> {
+  private async updateListItem(itemId: number, payload: Partial<{ PICId: number | null; ManagerId: number | null; Division: string; Service: string; Year: string }>): Promise<boolean> {
     const endpoint =
       `${this.context.pageContext.web.absoluteUrl}` +
       `/_api/web/lists/getbytitle('${this.listName}')/items(${itemId})`;
@@ -151,17 +151,21 @@ export class DivisionServiceService {
    * Gets services (with Id and PIC) for a given division. The Id is needed to
    * subsequently look up the Service field's version history.
    */
-  public async getServicesWithIdByDivision(division: string): Promise<Array<{ Id: number; Service: string; PIC?: string }>> {
+  public async getServicesWithIdByDivision(division: string, year?: string): Promise<Array<{ Id: number; Service: string; PIC?: string }>> {
     if (!division) {
       return [];
     }
 
     try {
       const escapedDivision = this.escapeODataValue(division);
+      let filter = `Division eq '${escapedDivision}'`;
+      if (year) {
+        filter += ` and Year eq '${this.escapeODataValue(year)}'`;
+      }
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Service,PIC/Title&$filter=Division eq '${escapedDivision}'&$orderby=Service asc&$expand=PIC`;
+        `?$select=Id,Service,PIC/Title&$filter=${filter}&$orderby=Service asc&$expand=PIC`;
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.get(
         endpoint,
@@ -189,6 +193,128 @@ export class DivisionServiceService {
       console.error('DivisionServiceService getServicesWithIdByDivision error:', error);
       return [];
     }
+  }
+
+  /** Gets the distinct set of Year values present in the Division_Service list. */
+  public async getAllYears(): Promise<string[]> {
+    try {
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items` +
+        `?$select=Year&$orderby=Year desc`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch years:', response.status);
+        return [];
+      }
+
+      const data = await response.json();
+      const rows = Array.isArray(data.value) ? (data.value as Array<{ Year?: string }>) : [];
+      const uniqueYears: string[] = [];
+
+      rows.forEach(row => {
+        const year = (row.Year || '').toString().trim();
+        if (year && uniqueYears.indexOf(year) === -1) {
+          uniqueYears.push(year);
+        }
+      });
+
+      return uniqueYears.sort((a, b) => Number(b) - Number(a));
+    } catch (error) {
+      console.error('DivisionServiceService getAllYears error:', error);
+      return [];
+    }
+  }
+
+  /** Gets all Division_Service items (optionally filtered by Year) for management purposes. */
+  public async getAllItemsWithDetails(year?: string): Promise<Array<{
+    Id: number;
+    Division: string;
+    Service: string;
+    Year: string;
+    PICId?: number;
+    PICTitle?: string;
+    PICEmail?: string;
+    ManagerId?: number;
+    ManagerTitle?: string;
+    ManagerEmail?: string;
+  }>> {
+    try {
+      const filter = year ? `?$filter=Year eq '${this.escapeODataValue(year)}'&` : '?';
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items` +
+        `${filter}$select=Id,Division,Service,Year,PICId,PIC/Title,PIC/EMail,ManagerId,Manager/Title,Manager/EMail&$expand=PIC,Manager&$orderby=Division asc,Service asc`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch Division_Service items:', response.status);
+        return [];
+      }
+
+      const data = await response.json();
+      const rows = Array.isArray(data.value)
+        ? (data.value as Array<{
+            Id: number;
+            Division?: string;
+            Service?: string;
+            Year?: string;
+            PICId?: number;
+            PIC?: { Title?: string; EMail?: string };
+            ManagerId?: number;
+            Manager?: { Title?: string; EMail?: string };
+          }>)
+        : [];
+
+      return rows.map(row => ({
+        Id: row.Id,
+        Division: row.Division || '',
+        Service: row.Service || '',
+        Year: row.Year || '',
+        PICId: row.PICId,
+        PICTitle: row.PIC?.Title,
+        PICEmail: row.PIC?.EMail,
+        ManagerId: row.ManagerId,
+        ManagerTitle: row.Manager?.Title,
+        ManagerEmail: row.Manager?.EMail,
+      }));
+    } catch (error) {
+      console.error('DivisionServiceService getAllItemsWithDetails error:', error);
+      return [];
+    }
+  }
+
+  /** Updates Division, Service, Year and/or PIC for a Division_Service item. */
+  public async updateItemDetails(
+    itemId: number,
+    payload: { division?: string; service?: string; year?: string; picId?: number; managerId?: number }
+  ): Promise<boolean> {
+    const updatePayload: { [key: string]: unknown } = {};
+    if (payload.division !== undefined) {
+      updatePayload.Division = payload.division;
+    }
+    if (payload.service !== undefined) {
+      updatePayload.Service = payload.service;
+    }
+    if (payload.year !== undefined) {
+      updatePayload.Year = payload.year;
+    }
+    if (payload.picId !== undefined) {
+      updatePayload.PICId = payload.picId;
+    }
+    if (payload.managerId !== undefined) {
+      updatePayload.ManagerId = payload.managerId;
+    }
+    return this.updateListItem(itemId, updatePayload as Partial<{ Division: string; Service: string; Year: string; PICId: number; ManagerId: number }>);
   }
 
   /**

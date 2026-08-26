@@ -47,6 +47,47 @@ export class AcDataService {
     return results;
   }
 
+  /** Fetch AC_Data items filtered by one or more Department values (OR match) */
+  public async getAcDataByDepartments(departments: string[]): Promise<IAcDataItem[]> {
+    const uniqueDepartments = (departments || []).filter(Boolean);
+    if (uniqueDepartments.length === 0) {
+      return [];
+    }
+
+    const webUrl = this.context.pageContext.web.absoluteUrl;
+    const filter = uniqueDepartments
+      .map(department => `Department eq '${department.replace(/'/g, "''")}'`)
+      .join(' or ');
+
+    const endpoint =
+      `${webUrl}/_api/web/lists/getbytitle('${this.listName}')/items` +
+      `?$select=Id,Year,Department,Data` +
+      `&$filter=${filter}` +
+      `&$orderby=Year desc`;
+
+    const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+      endpoint,
+      SPHttpClient.configurations.v1
+    );
+
+    if (!response.ok) {
+      console.error('Failed to fetch AC_Data by Departments:', uniqueDepartments);
+      return [];
+    }
+
+    const data = await response.json();
+    const items = data.value || [];
+
+    const results: IAcDataItem[] = items.map((item: any) => ({
+      Id: item.Id,
+      Year: item.Year || '',
+      Department: item.Department || '',
+      Data: item.Data || ''
+    }));
+
+    return results;
+  }
+
   /** Fetch AC_Data items filtered by Department */
   public async getAcDataByDepartment(department: string): Promise<IAcDataItem[]> {
     const webUrl = this.context.pageContext.web.absoluteUrl;

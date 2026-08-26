@@ -72,19 +72,27 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
     const effectiveYear = availableYears.indexOf(selectedYear) > -1 ? selectedYear : currentYear;
 
     try {
+      const serviceFilter = this.props.serviceFilter;
+      const serviceNames = Array.isArray(serviceFilter)
+        ? serviceFilter.filter(Boolean)
+        : serviceFilter
+          ? [serviceFilter]
+          : [];
+      // "Overall Result" is looked up from AC_Data by the selected service name
+      // (e.g. "Application Automation"). When no specific service is selected
+      // (top-level ESVN / Internal & Sales Support / Digital Technology Support
+      // views), fall back to the department code itself (ESVN / ISS / DTS).
+      const acDepartments = serviceNames.length > 0 ? serviceNames : [department];
+
       const [allAcItems, allActionPlans] = await Promise.all([
-        this.acDataService.getAcDataByDepartment(department),
+        this.acDataService.getAcDataByDepartments(acDepartments),
         fullDepartment
           ? this.actionPlanService.getActionPlansByDepartment(fullDepartment)
           : Promise.resolve([]),
       ]);
 
-      const serviceFilter = this.props.serviceFilter;
-      const serviceFilterList = Array.isArray(serviceFilter)
-        ? serviceFilter.filter(Boolean).map(name => name.toLowerCase())
-        : serviceFilter
-          ? [serviceFilter.toLowerCase()]
-          : [];
+      const serviceFilterList = serviceNames.map(name => name.toLowerCase());
+      console.log("Service Filter List: " + serviceFilterList);
 
       const filteredActionPlans = serviceFilterList.length > 0
         ? allActionPlans.filter(item => serviceFilterList.indexOf((item.Service || '').toLowerCase()) > -1)

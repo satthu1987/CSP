@@ -12,6 +12,7 @@ import Results from './Results/Results';
 import ServiceResultDirectory from './Results/ServiceResultDirectory';
 import Dashboard from './Dashboard/Dashboard';
 import RoleManagement from './RoleManagement/RoleManagement';
+import DivisionServiceManagement from './DivisionServiceManagement/DivisionServiceManagement';
 
 export default class CustomerSatisfaction
   extends React.Component<ICustomerSatisfactionProps, ICustomerSatisfactionState> {
@@ -226,6 +227,10 @@ export default class CustomerSatisfaction
     return <RoleManagement context={this.props.context} />;
   }
 
+  private renderDivisionServiceManagement(): JSX.Element {
+    return <DivisionServiceManagement context={this.props.context} />;
+  }
+
   private renderDashboard(): JSX.Element {
     const { currentUserDisplayName } = this.props;
     return <Dashboard currentUserDisplayName={currentUserDisplayName} />;
@@ -261,6 +266,7 @@ export default class CustomerSatisfaction
       case 'dtsResidential': return this.renderDTSResidential();
       case 'serviceResult': return this.renderSelectedServiceResult();
       case 'admin':      return this.renderRoleManagement();
+      case 'divisionServiceManagement': return this.renderDivisionServiceManagement();
       default:           return this.renderHome();
     }
   }

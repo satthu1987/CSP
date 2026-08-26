@@ -8,6 +8,7 @@ export type ViewName =
   | 'actionplan'
   | 'dashboard'
   | 'admin'
+  | 'divisionServiceManagement'
   | 'esvn'
   | 'iss'
   | 'is'
@@ -208,6 +209,7 @@ export default class Sidebar extends React.Component<ISidebarProps, ISidebarStat
               {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Administration</div>}
               {/* {this.renderNavItem('ViewDashboard', 'Dashboard', 'dashboard')} */}
               {this.renderNavItem('WorkforceManagement', 'Role Management', 'admin')}
+              {this.renderNavItem('Org', 'Division – Service Management', 'divisionServiceManagement')}
             </div>
           )}
         </nav>

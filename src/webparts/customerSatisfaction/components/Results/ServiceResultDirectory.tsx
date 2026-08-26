@@ -24,6 +24,8 @@ interface IServiceResultDirectoryState {
   isLoading: boolean;
   items: IServiceResultDirectoryItem[];
   loadingServiceKey?: string;
+  selectedYear: string;
+  availableYears: string[];
 }
 
 export default class ServiceResultDirectory extends React.Component<
@@ -34,15 +36,19 @@ export default class ServiceResultDirectory extends React.Component<
 
   constructor(props: IServiceResultDirectoryProps) {
     super(props);
+    const currentYear = new Date().getFullYear().toString();
     this.state = {
       isLoading: true,
       items: [],
+      selectedYear: currentYear,
+      availableYears: [currentYear],
     };
     this.divisionServiceService = new DivisionServiceService(props.context, 'Division_Service');
   }
 
   public async componentDidMount(): Promise<void> {
-    await this.loadItems(this.props.divisions);
+    const selectedYear = await this.loadYears();
+    await this.loadItems(this.props.divisions, selectedYear);
   }
 
   public async componentDidUpdate(prevProps: IServiceResultDirectoryProps): Promise<void> {
@@ -50,18 +56,32 @@ export default class ServiceResultDirectory extends React.Component<
       prevProps.divisions.join('|') !== this.props.divisions.join('|');
 
     if (hasDivisionChanged) {
-      await this.loadItems(this.props.divisions);
+      await this.loadItems(this.props.divisions, this.state.selectedYear);
     }
   }
 
-  private loadItems = async (divisions: string[]): Promise<void> => {
+  private loadYears = async (): Promise<string> => {
+    const currentYear = new Date().getFullYear().toString();
+    try {
+      const years = await this.divisionServiceService.getAllYears();
+      const availableYears = years.length > 0 ? years : [currentYear];
+      const selectedYear = availableYears.indexOf(currentYear) > -1 ? currentYear : availableYears[0];
+      this.setState({ availableYears, selectedYear });
+      return selectedYear;
+    } catch (error) {
+      console.error('Failed to load Division_Service years:', error);
+      return currentYear;
+    }
+  };
+
+  private loadItems = async (divisions: string[], year: string): Promise<void> => {
     this.setState({ isLoading: true });
 
     try {
       const result: IServiceResultDirectoryItem[] = [];
 
       for (const division of divisions) {
-        const services = await this.divisionServiceService.getServicesWithIdByDivision(division);
+        const services = await this.divisionServiceService.getServicesWithIdByDivision(division, year);
         services.forEach(service => {
           result.push({ Id: service.Id, Division: division, Service: service.Service, PIC: service.PIC });
         });
@@ -72,6 +92,14 @@ export default class ServiceResultDirectory extends React.Component<
       console.error('Failed to load Division_Service directory:', error);
       this.setState({ isLoading: false, items: [] });
     }
+  };
+
+  private onYearFilterChange = (event: React.ChangeEvent<HTMLSelectElement>): void => {
+    const selectedYear = event.target.value;
+    this.setState({ selectedYear });
+    this.loadItems(this.props.divisions, selectedYear).catch(error => {
+      console.error('Error changing year filter:', error);
+    });
   };
 
   private handleShowResult = async (
@@ -98,7 +126,7 @@ export default class ServiceResultDirectory extends React.Component<
 
   public render(): JSX.Element {
     const { title, resultDepartment, getResultDepartmentByDivision } = this.props;
-    const { isLoading, items, loadingServiceKey } = this.state;
+    const { isLoading, items, loadingServiceKey, selectedYear, availableYears } = this.state;
 
     return (
       <main className={styles.mainContainer}>
@@ -111,6 +139,24 @@ export default class ServiceResultDirectory extends React.Component<
         </div>
 
         <div className={styles.content}>
+          <div className={styles.filterSection}>
+            <div className={styles.filterGroup}>
+              <label htmlFor="service-directory-year-filter">Year</label>
+              <select
+                id="service-directory-year-filter"
+                className={styles.filterSelect}
+                value={selectedYear}
+                onChange={this.onYearFilterChange}
+              >
+                {availableYears.map(year => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className={styles.gridContainer}>
             {isLoading ? (
               <div className={styles.spinnerContainer}>

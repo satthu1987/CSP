@@ -4,6 +4,7 @@ export type ViewName =
   | 'actionplan'
   | 'dashboard'
   | 'admin'
+  | 'divisionServiceManagement'
   | 'esvn'
   | 'iss'
   | 'is'

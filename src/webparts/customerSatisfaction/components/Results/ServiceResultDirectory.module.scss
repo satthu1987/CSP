@@ -36,6 +36,46 @@
   padding: 24px 40px;
 }
 
+.filterSection {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+  }
+}
+
+.filterSelect {
+  padding: 8px 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  font-size: 14px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.2s;
+
+  &:focus {
+    outline: none;
+    border-color: #ff5722;
+    box-shadow: 0 0 0 2px rgba(255, 87, 34, 0.1);
+  }
+}
+
 .gridContainer {
   border: 1px solid #e0e0e0;
   border-radius: 8px;
