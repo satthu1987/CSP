@@ -537,10 +537,11 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
             <div className={styles.gridHeader}>
               <div className={styles.colService}>Service</div>
               <div className={styles.colTitle}>Original Customer Feedback</div>
+              <div className={styles.colTitle}>Updated Feedback</div>
               <div className={styles.colActions}>Action</div>
               <div className={styles.colPIC}>PIC</div>
               <div className={styles.colStatus}>Status</div>
-              <div className={styles.colResult}>Result</div>
+              <div className={styles.colResult}>Action Output</div>
               <div className={styles.colRelatedLinks}>Related Links</div>
               <div className={styles.colAction} />
             </div>
@@ -558,6 +559,9 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
                   <div className={styles.colTitle}>
                     {this.getGridPreviewText(plan.CustomerFeedback)}
                   </div>
+                  <div className={styles.colTitle}>
+                    {this.getGridPreviewText(plan.UpdatedFeedback)}
+                  </div>
                   <div className={styles.colActions}>
                     {this.getGridPreviewText(Array.isArray(plan.Actions) ? plan.Actions.join('\n') : plan.Actions)}
                   </div>
@@ -571,7 +575,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
                     {this.getGridPreviewText(Array.isArray(plan.Results) ? plan.Results.join('\n') : (plan.Results as unknown as string))}
                   </div>
                   <div className={styles.colRelatedLinks}>
-                    {this.getGridPreviewText(plan.RelatedLinks)}
+                    {plan.RelatedLinks ? <a href={this.getGridPreviewText(plan.RelatedLinks) || '—'}>View</a> : "-" }
                   </div>
                   <div className={styles.colAction}>
                     {!plan.Actions || plan.Actions.length === 0 ? (
@@ -844,7 +848,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
           
 
           <div className={styles.formGroup}>
-            <label>Result</label>
+            <label>Action Output</label>
             <ReactQuill
               theme="snow"
               value={Array.isArray(formData.Results) ? formData.Results.join('\n') : (formData.Results || '')}

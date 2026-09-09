@@ -155,19 +155,19 @@
 
 .gridHeader {
   display: grid;
-  grid-template-columns: 1fr 1.5fr 1.2fr 1fr 0.9fr 1.2fr 1.2fr 0.5fr;
+  grid-template-columns: 1fr 1.5fr 1.5fr 1fr 1fr 0.9fr 1fr 1fr 0.5fr;
   gap: 16px;
   padding: 16px;
   background: #f5f5f5;
   border-bottom: 1px solid #e0e0e0;
-  font-weight: 600;
+  font-weight: bolder;
   color: #333;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .gridRow {
   display: grid;
-  grid-template-columns: 1fr 1.5fr 1.2fr 1fr 0.9fr 1.2fr 1.2fr 0.5fr;
+  grid-template-columns: 1fr 1.5fr 1.5fr 1fr 1fr 0.9fr 1fr 1fr 0.5fr;
   gap: 16px;
   padding: 16px;
   border-bottom: 1px solid #e0e0e0;
@@ -184,41 +184,39 @@
 }
 
 .colTitle {
-  font-weight: 500;
-  color: #333;
+  color: #666;
+  font-size: 12px;
 }
 
 .colService {
   color: #666;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .colActions {
   color: #666;
-  font-size: 14px;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .colResult {
   color: #666;
-  font-size: 14px;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .colRelatedLinks {
   color: #666;
-  font-size: 14px;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .colStatus {
-  text-align: center;
+  color: #666;
+  font-size: 12px;
 }
 
 .colAction {
@@ -251,7 +249,7 @@
 
 .colPIC {
   color: #666;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .emptyMessage {
@@ -270,6 +268,7 @@
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
+  width: fit-content;
 }
 
 .statusOpen {
@@ -357,10 +356,16 @@
   }
 
   label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #666;
-    text-transform: uppercase;
+    display: inline-block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #e64a19;
+      background: #fff3ec;
+      border-left: 3px solid #ff5722;
+      border-radius: 4px;
+      padding: 4px 10px;
+      margin-bottom: 8px;
+      letter-spacing: 0.3px;
   }
 
    input,

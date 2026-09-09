@@ -216,6 +216,10 @@
   max-height: 85vh;
 
   .formGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    
     label {
       display: inline-block;
       font-size: 13px;

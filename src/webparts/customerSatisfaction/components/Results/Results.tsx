@@ -252,7 +252,7 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
             <Spinner size={SpinnerSize.medium} label="Loading action plans..." />
           </div>
         ) : actionPlans.length === 0 ? (
-          <div className={styles.emptyMessage}>No action plans found for this department.</div>
+          <div className={styles.emptyMessage}>No action plan after analyzing the survey.</div>
         ) : (
           <div className={styles.planGrid}>
             <div className={styles.planHeader}>
@@ -261,7 +261,7 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
               <div className={styles.colService}>Action</div>
               <div className={styles.colTimeline}>Timeline</div>
               <div className={styles.colStatus}>Status</div>
-              <div className={styles.colResult}>Results</div>
+              <div className={styles.colResult}>Action Output</div>
               <div className={styles.colLink}>Link</div>
               <div className={styles.colAction} />
             </div>
@@ -296,13 +296,13 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
     );
   }
 
-  private renderResultsSection(): JSX.Element {
+  private renderResultsSection(label:string,selectedyear:string): JSX.Element {
     const { acItems, isLoadingAc } = this.state;
     const { department } = this.props;
 
     return (
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>Overall Result</h2>
+        <h2 className={styles.sectionTitle}>{label} -{selectedyear} Overall Result</h2>
 
         {isLoadingAc ? (
           <div className={styles.spinnerContainer}>
@@ -420,7 +420,7 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
           <div className={styles.filterSection}>
             <div className={styles.filterGroup}>
               <label htmlFor="results-year-filter">Please select a year to view data</label>
-              <label htmlFor="results-year-filter">Year</label>
+              {/* <label htmlFor="results-year-filter">Year</label> */}
               <select
                 id="results-year-filter"
                 className={styles.filterSelect}
@@ -436,7 +436,7 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
             </div>
           </div>
 
-          {this.renderResultsSection()}
+          {this.renderResultsSection(label,selectedYear)}
           {!this.props.hideActionPlan && this.renderActionPlanGrid()}
         </div>
         {this.renderDetailPanel()}
