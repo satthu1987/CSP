@@ -7,12 +7,14 @@ import { CSPUserRole_Service } from '../services/CSPUserRole_Service';
 import Sidebar from './SideBar/Sidebar';
 import Home from './Home/Home';
 import About from './About/About';
+import Guide from './Guide/Guide';
 import ActionPlan from './ActionPlan/ActionPlan';
 import Results from './Results/Results';
 import ServiceResultDirectory from './Results/ServiceResultDirectory';
 import Dashboard from './Dashboard/Dashboard';
 import RoleManagement from './RoleManagement/RoleManagement';
 import DivisionServiceManagement from './DivisionServiceManagement/DivisionServiceManagement';
+import DTSServiceDirectory from './DTSServiceDirectory/DTSServiceDirectory';
 
 export default class CustomerSatisfaction
   extends React.Component<ICustomerSatisfactionProps, ICustomerSatisfactionState> {
@@ -97,6 +99,17 @@ export default class CustomerSatisfaction
     );
   }
 
+  private renderGuide(): JSX.Element {
+    return (
+      <main className={styles.mainPlain}>
+        <div className={styles.pageBreadcrumb}>
+          Home › <strong>User Guide</strong>
+        </div>
+        <Guide />
+      </main>
+    );
+  }
+
   private renderActionPlan(): JSX.Element {
     const { userRole } = this.state;
 
@@ -144,7 +157,12 @@ export default class CustomerSatisfaction
   }
 
   private renderDTS(): JSX.Element {
-    return <Results context={this.props.context} department="DTS" hideActionPlan={true} />;
+    return (
+      <DTSServiceDirectory
+        context={this.props.context}
+        onShowResult={this.openServiceResult}
+      />
+    );
   }
 
   private renderDTSComponentManufacturing(): JSX.Element {
@@ -252,6 +270,7 @@ export default class CustomerSatisfaction
     switch (this.state.currentView) {
       case 'home':       return this.renderHome();
       case 'about':      return this.renderAbout();
+      case 'guide':      return this.renderGuide();
       case 'actionplan': return this.renderActionPlan();
       case 'dashboard':  return this.renderDashboard();
       case 'esvn':    return this.renderCompany();

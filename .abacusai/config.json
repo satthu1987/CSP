@@ -5,7 +5,9 @@
       "Bash(findstr *)",
       "Bash(git checkout src/webparts/customerSatisfaction/components/ActionPlan/ActionPlan.tsx *)",
       "Bash(npx tsc *)",
-      "Bash(npx gulp bundle *)"
+      "Bash(npx gulp bundle *)",
+      "Bash(npx gulp build *)",
+      "Bash(echo test)"
     ]
   }
 }

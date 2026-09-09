@@ -165,7 +165,7 @@ export class DivisionServiceService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Service,PIC/Title&$filter=${filter}&$orderby=Service asc&$expand=PIC`;
+        `?$select=Id,Service,PICId,PIC/Title&$filter=${filter}&$orderby=Service asc&$expand=PIC`;
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.get(
         endpoint,
@@ -179,20 +179,127 @@ export class DivisionServiceService {
 
       const data = await response.json();
       const rows = Array.isArray(data.value)
-        ? (data.value as Array<{ Id: number; Service?: string; PIC?: { Title?: string } }>)
+        ? (data.value as Array<{ Id: number; Service?: string; PICId?: number; PIC?: { Title?: string } | Array<{ Title?: string }> }>)
         : [];
 
-      return rows
-        .filter(row => (row.Service || '').trim())
-        .map(row => ({
-          Id: row.Id,
-          Service: (row.Service || '').trim(),
-          PIC: row.PIC?.Title,
-        }));
+      const results = await Promise.all(
+        rows
+          .filter(row => (row.Service || '').trim())
+          .map(async row => {
+            const picValue = Array.isArray(row.PIC) ? row.PIC[0] : row.PIC;
+            let pic = picValue?.Title;
+
+            if (!pic && row.PICId) {
+              pic = await this.getUserTitleById(row.PICId);
+            }
+
+            return {
+              Id: row.Id,
+              Service: (row.Service || '').trim(),
+              PIC: pic,
+            };
+          })
+      );
+
+      return results;
     } catch (error) {
       console.error('DivisionServiceService getServicesWithIdByDivision error:', error);
       return [];
     }
+  }
+
+  /** Fallback lookup: resolves a user's display name by SharePoint user Id when $expand doesn't yield one. */
+  private async getUserTitleById(userId: number): Promise<string | undefined> {
+    try {
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/getuserbyid(${userId})`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        return undefined;
+      }
+
+      const data = await response.json();
+      return data?.Title;
+    } catch (error) {
+      console.error('DivisionServiceService getUserTitleById error:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Expanded person fields can come back as an object, an array (multi-person
+   * field) or be missing even though the id is set; this normalizes the value
+   * to a single user object.
+   */
+  private normalizeExpandedUser(
+    value: { Title?: string; EMail?: string } | Array<{ Title?: string; EMail?: string }> | undefined
+  ): { Title?: string; EMail?: string } | undefined {
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value[0] : undefined;
+    }
+    return value;
+  }
+
+  /** Returns the first user id when the person field id comes back as an array (multi-person field). */
+  private firstUserId(value: number | number[] | undefined): number | undefined {
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value[0] : undefined;
+    }
+    return value;
+  }
+
+  /** Fallback lookup: resolves a user's Title and EMail by SharePoint user Id. */
+  private async getUserDetailsById(userId: number): Promise<{ Title?: string; EMail?: string } | undefined> {
+    try {
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/getuserbyid(${userId})?$select=Id,Title,Email`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('Failed to resolve user by id:', response.status);
+        return undefined;
+      }
+
+      const user = await response.json() as { Title?: string; Email?: string };
+      return { Title: (user.Title || '').trim(), EMail: (user.Email || '').trim() };
+    } catch (error) {
+      console.error('DivisionServiceService getUserDetailsById error:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Resolves a person field's Title/EMail from the expanded value, falling back
+   * to a lookup by id when the expansion is missing or incomplete.
+   */
+  private async resolveUserDetails(
+    expanded: { Title?: string; EMail?: string } | Array<{ Title?: string; EMail?: string }> | undefined,
+    userId: number | number[] | undefined
+  ): Promise<{ Title?: string; EMail?: string } | undefined> {
+    const user = this.normalizeExpandedUser(expanded);
+    const fallbackId = this.firstUserId(userId);
+
+    let title = (user?.Title || '').trim();
+    let email = (user?.EMail || '').trim();
+
+    if ((!title || !email) && fallbackId !== undefined) {
+      const details = await this.getUserDetailsById(fallbackId);
+      title = title || (details?.Title || '');
+      email = email || (details?.EMail || '');
+    }
+
+    return title || email ? { Title: title, EMail: email } : undefined;
   }
 
   /** Gets the distinct set of Year values present in the Division_Service list. */
@@ -268,25 +375,32 @@ export class DivisionServiceService {
             Division?: string;
             Service?: string;
             Year?: string;
-            PICId?: number;
-            PIC?: { Title?: string; EMail?: string };
-            ManagerId?: number;
-            Manager?: { Title?: string; EMail?: string };
+            PICId?: number | number[];
+            PIC?: { Title?: string; EMail?: string } | Array<{ Title?: string; EMail?: string }>;
+            ManagerId?: number | number[];
+            Manager?: { Title?: string; EMail?: string } | Array<{ Title?: string; EMail?: string }>;
           }>)
         : [];
 
-      return rows.map(row => ({
-        Id: row.Id,
-        Division: row.Division || '',
-        Service: row.Service || '',
-        Year: row.Year || '',
-        PICId: row.PICId,
-        PICTitle: row.PIC?.Title,
-        PICEmail: row.PIC?.EMail,
-        ManagerId: row.ManagerId,
-        ManagerTitle: row.Manager?.Title,
-        ManagerEmail: row.Manager?.EMail,
+      const results = await Promise.all(rows.map(async row => {
+        const pic = await this.resolveUserDetails(row.PIC, row.PICId);
+        const manager = await this.resolveUserDetails(row.Manager, row.ManagerId);
+
+        return {
+          Id: row.Id,
+          Division: row.Division || '',
+          Service: row.Service || '',
+          Year: row.Year || '',
+          PICId: this.firstUserId(row.PICId),
+          PICTitle: pic?.Title,
+          PICEmail: pic?.EMail,
+          ManagerId: this.firstUserId(row.ManagerId),
+          ManagerTitle: manager?.Title,
+          ManagerEmail: manager?.EMail,
+        };
       }));
+
+      return results;
     } catch (error) {
       console.error('DivisionServiceService getAllItemsWithDetails error:', error);
       return [];

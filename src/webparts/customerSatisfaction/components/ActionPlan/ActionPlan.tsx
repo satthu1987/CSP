@@ -40,7 +40,6 @@ interface IActionPlanState {
   choiceOptions: { [key: string]: string[] };
   departmentServices: string[];
   isDepartmentServicesLoading: boolean;
-  filterTitle: string;
   filterService: string;
   filterPIC: string;
   filterStatus: string;
@@ -68,7 +67,6 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
       choiceOptions: {},
       departmentServices: [],
       isDepartmentServicesLoading: false,
-      filterTitle: '',
       filterService: '',
       filterPIC: '',
       filterStatus: '',
@@ -328,16 +326,15 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
   }
 
   private getFilteredActionPlans(): IActionplan[] {
-    const { actionPlans, filterTitle, filterService, filterPIC, filterStatus, filterYear } = this.state;
-    
+    const { actionPlans, filterService, filterPIC, filterStatus, filterYear } = this.state;
+
     return actionPlans.filter(plan => {
-      const titleMatch = (plan.CustomerFeedback || '').toLowerCase().indexOf(filterTitle.toLowerCase()) > -1;
       const serviceMatch = filterService === '' || (plan.Service || '').toLowerCase() === filterService.toLowerCase();
       const picMatch = (plan.PIC?.Title || '').toLowerCase().indexOf(filterPIC.toLowerCase()) > -1;
       const statusMatch = filterStatus === '' || (plan.Status || '').toLowerCase() === filterStatus.toLowerCase();
       const yearMatch = filterYear === '' || (plan.Year || '') === filterYear;
-      
-      return titleMatch && serviceMatch && picMatch && statusMatch && yearMatch;
+
+      return serviceMatch && picMatch && statusMatch && yearMatch;
     });
   }
 
@@ -443,7 +440,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
   }
 
   private renderGrid(): JSX.Element {
-    const { actionPlans, isLoading, filterTitle, filterService, filterPIC, filterStatus, filterYear, choiceOptions } = this.state;
+    const { actionPlans, isLoading, filterService, filterPIC, filterStatus, filterYear, choiceOptions } = this.state;
     const filteredPlans = this.getFilteredActionPlans();
     const statusOptions = Array.isArray(choiceOptions.Status) ? choiceOptions.Status : [];
     const serviceOptions = this.getServiceFilterOptions();
@@ -470,59 +467,6 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
           <>
             <div className={styles.filterSection}>
               <div className={styles.filterGroup}>
-                <label>Customer Feedback</label>
-                <input
-                  type="text"
-                  placeholder="Search by Customer Feedback..."
-                  value={filterTitle}
-                  onChange={(e) => this.setState({ filterTitle: e.target.value })}
-                  className={styles.filterInput}
-                />
-              </div>
-              
-              <div className={styles.filterGroup}>
-                <label>PIC</label>
-                <select
-                  value={filterPIC}
-                  onChange={(e) => this.setState({ filterPIC: e.target.value })}
-                  className={styles.filterSelect}
-                >
-                  <option value="">All PICs</option>
-                  {uniquePICs.map((pic: string) => (
-                    <option key={pic} value={pic}>{pic}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className={styles.filterGroup}>
-                <label>Status</label>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => this.setState({ filterStatus: e.target.value })}
-                  className={styles.filterSelect}
-                >
-                  <option value="">All Status</option>
-                  {statusOptions.map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className={styles.filterGroup}>
-                <label>Year</label>
-                <select
-                  value={filterYear}
-                  onChange={(e) => this.setState({ filterYear: e.target.value })}
-                  className={styles.filterSelect}
-                >
-                  <option value="">All Years</option>
-                  {this.getYearOptions().map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className={styles.filterGroup}>
                 <label>Service</label>
                 <select
                   value={filterService}
@@ -539,25 +483,66 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
                   )}
                 </select>
               </div>
-              
+
+              <div className={styles.filterGroup}>
+                <label>Year</label>
+                <select
+                  value={filterYear}
+                  onChange={(e) => this.setState({ filterYear: e.target.value })}
+                  className={styles.filterSelect}
+                >
+                  <option value="">All Years</option>
+                  {this.getYearOptions().map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.filterGroup}>
+                <label>PIC</label>
+                <select
+                  value={filterPIC}
+                  onChange={(e) => this.setState({ filterPIC: e.target.value })}
+                  className={styles.filterSelect}
+                >
+                  <option value="">All PICs</option>
+                  {uniquePICs.map((pic: string) => (
+                    <option key={pic} value={pic}>{pic}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.filterGroup}>
+                <label>Status</label>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => this.setState({ filterStatus: e.target.value })}
+                  className={styles.filterSelect}
+                >
+                  <option value="">All Status</option>
+                  {statusOptions.map(status => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+              </div>
+
               <button
                 className={styles.clearFilterBtn}
-                onClick={() => this.setState({ filterTitle: '', filterService: '', filterPIC: '', filterStatus: '', filterYear: '' })}
+                onClick={() => this.setState({ filterService: '', filterPIC: '', filterStatus: '', filterYear: '' })}
               >
                 Clear Filters
               </button>
             </div>
 
             <div className={styles.gridHeader}>
-              <div className={styles.colTitle}>Original Customer Feedback</div>
-              <div className={styles.colDepartment}>Department</div>
               <div className={styles.colService}>Service</div>
-              <div className={styles.colProductLine}>Product Line</div>
-              <div className={styles.colUpdatedFeedback}>Customer Feedback</div>
+              <div className={styles.colTitle}>Original Customer Feedback</div>
+              <div className={styles.colActions}>Action</div>
+              <div className={styles.colPIC}>PIC</div>
+              <div className={styles.colStatus}>Status</div>
               <div className={styles.colResult}>Result</div>
               <div className={styles.colRelatedLinks}>Related Links</div>
-              <div className={styles.colStatus}>Status</div>
-              <div className={styles.colAction}>Action</div>
+              <div className={styles.colAction} />
             </div>
             {filteredPlans.length === 0 ? (
               <div className={styles.emptyMessage}>
@@ -569,25 +554,24 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
                   key={plan.Id}
                   className={styles.gridRow}
                 >
+                  <div className={styles.colService}>{plan.Service || '-'}</div>
                   <div className={styles.colTitle}>
                     {this.getGridPreviewText(plan.CustomerFeedback)}
                   </div>
-                  <div className={styles.colDepartment}>{plan.Department || '-'}</div>
-                  <div className={styles.colService}>{plan.Service || '-'}</div>
-                  <div className={styles.colProductLine}>{plan.ProductLine || '-'}</div>
-                  <div className={styles.colUpdatedFeedback}>
-                    {this.getGridPreviewText(plan.UpdatedFeedback)}
+                  <div className={styles.colActions}>
+                    {this.getGridPreviewText(Array.isArray(plan.Actions) ? plan.Actions.join('\n') : plan.Actions)}
+                  </div>
+                  <div className={styles.colPIC}>{plan.PIC?.Title || '-'}</div>
+                  <div className={styles.colStatus}>
+                    <span className={`${styles.badge} ${this.getStatusClassName(plan.Status)}`}>
+                      {plan.Status || '-'}
+                    </span>
                   </div>
                   <div className={styles.colResult}>
                     {this.getGridPreviewText(Array.isArray(plan.Results) ? plan.Results.join('\n') : (plan.Results as unknown as string))}
                   </div>
                   <div className={styles.colRelatedLinks}>
                     {this.getGridPreviewText(plan.RelatedLinks)}
-                  </div>
-                  <div className={styles.colStatus}>
-                    <span className={`${styles.badge} ${this.getStatusClassName(plan.Status)}`}>
-                      {plan.Status || '-'}
-                    </span>
                   </div>
                   <div className={styles.colAction}>
                     {!plan.Actions || plan.Actions.length === 0 ? (

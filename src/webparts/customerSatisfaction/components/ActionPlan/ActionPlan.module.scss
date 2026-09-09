@@ -155,7 +155,7 @@
 
 .gridHeader {
   display: grid;
-  grid-template-columns: 1.7fr 1fr 1fr 1fr 1.7fr 1.4fr 1.4fr 0.9fr 0.7fr;
+  grid-template-columns: 1fr 1.5fr 1.2fr 1fr 0.9fr 1.2fr 1.2fr 0.5fr;
   gap: 16px;
   padding: 16px;
   background: #f5f5f5;
@@ -167,7 +167,7 @@
 
 .gridRow {
   display: grid;
-  grid-template-columns: 1.7fr 1fr 1fr 1fr 1.7fr 1.4fr 1.4fr 0.9fr 0.7fr;
+  grid-template-columns: 1fr 1.5fr 1.2fr 1fr 0.9fr 1.2fr 1.2fr 0.5fr;
   gap: 16px;
   padding: 16px;
   border-bottom: 1px solid #e0e0e0;
@@ -188,22 +188,12 @@
   color: #333;
 }
 
-.colDepartment {
-  color: #666;
-  font-size: 14px;
-}
-
 .colService {
   color: #666;
   font-size: 14px;
 }
 
-.colProductLine {
-  color: #666;
-  font-size: 14px;
-}
-
-.colUpdatedFeedback {
+.colActions {
   color: #666;
   font-size: 14px;
   overflow: hidden;
@@ -491,18 +481,13 @@
 @media (max-width: 1024px) {
   .gridHeader,
   .gridRow {
-    grid-template-columns: 2fr 1fr 1fr 1fr;
+    grid-template-columns: 2fr 1.5fr 1fr 0.7fr;
   }
 
-  .colPIC {
-    display: none;
-  }
-
+  .colPIC,
   .colRelatedLinks,
   .colResult,
-  .colProductLine,
-  .colUpdatedFeedback,
-  .colDepartment {
+  .colActions {
     display: none;
   }
 

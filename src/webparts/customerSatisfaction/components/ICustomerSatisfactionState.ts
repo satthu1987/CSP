@@ -15,7 +15,8 @@ export type ViewName =
   | 'dtsEngineeringTechnology'
   | 'dtsEnterpriseApplications'
   | 'dtsESTechnology'
-  | 'dtsResidential';
+  | 'dtsResidential'
+  | 'guide';
 
 export interface ICustomerSatisfactionState {
   isTeamLeader: boolean;

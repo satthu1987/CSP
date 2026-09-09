@@ -1,7 +1,7 @@
 import * as React from 'react';
 import styles from './Results.module.scss';
 import { WebPartContext } from '@microsoft/sp-webpart-base';
-import { Spinner, SpinnerSize } from '@fluentui/react';
+import { Icon, Modal, Spinner, SpinnerSize } from '@fluentui/react';
 import { AcDataService, IAcDataItem } from '../../services/AcDataService';
 import { ActionPlanService } from '../../services/ActionPlan_Service';
 import { IActionplan } from '../../Models/ActionplanModel';
@@ -21,6 +21,9 @@ interface IResultsState {
   isLoadingPlans: boolean;
   selectedYear: string;
   availableYears: string[];
+  selectedActionPlan?: IActionplan;
+  isDetailPanelOpen: boolean;
+  isLoadingDetail: boolean;
 }
 
 // Maps sidebar route department to the full department name used in the CSP list
@@ -45,6 +48,9 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
       isLoadingPlans: true,
       selectedYear: currentYear,
       availableYears: this.getFixedYearOptions(currentYear),
+      selectedActionPlan: undefined,
+      isDetailPanelOpen: false,
+      isLoadingDetail: false,
     };
     this.acDataService = new AcDataService(props.context);
     this.actionPlanService = new ActionPlanService(props.context, 'CSP');
@@ -212,6 +218,25 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
       : plainText;
   }
 
+  private openDetailPanel = async (plan: IActionplan): Promise<void> => {
+    this.setState({ isDetailPanelOpen: true, isLoadingDetail: true, selectedActionPlan: plan });
+    try {
+      const fullPlan = await this.actionPlanService.getActionPlanById(plan.Id);
+      this.setState({ selectedActionPlan: fullPlan || plan, isLoadingDetail: false });
+    } catch (error) {
+      console.error('Error loading action plan detail:', error);
+      this.setState({ isLoadingDetail: false });
+    }
+  };
+
+  private closeDetailPanel = (): void => {
+    this.setState({
+      isDetailPanelOpen: false,
+      selectedActionPlan: undefined,
+      isLoadingDetail: false,
+    });
+  };
+
   private renderActionPlanGrid(): JSX.Element {
     const { actionPlans, isLoadingPlans } = this.state;
     const { department } = this.props;
@@ -232,18 +257,19 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
           <div className={styles.planGrid}>
             <div className={styles.planHeader}>
               <div className={styles.colTitle}>Customer Feedback</div>
-              <div className={styles.colService}>Action</div>
               <div className={styles.colPIC}>PIC</div>
+              <div className={styles.colService}>Action</div>
               <div className={styles.colTimeline}>Timeline</div>
               <div className={styles.colStatus}>Status</div>
               <div className={styles.colResult}>Results</div>
               <div className={styles.colLink}>Link</div>
+              <div className={styles.colAction} />
             </div>
             {actionPlans.map(plan => (
               <div key={plan.Id} className={styles.planRow}>
                 <div className={styles.colTitle}>{this.getGridPreviewText(plan.UpdatedFeedback) || '—'}</div>
-                <div className={styles.colService}>{this.getGridPreviewText(plan.Actions) || '—'}</div>
                 <div className={styles.colPIC}>{plan.PIC?.Title || '—'}</div>
+                <div className={styles.colService}>{this.getGridPreviewText(plan.Actions) || '—'}</div>
                 <div className={styles.colTimeline}>{this.formatDate(plan.Timeline)}</div>
                 <div className={styles.colStatus}>
                   <span className={`${styles.badge} ${this.getStatusClass(plan.Status)}`}>
@@ -251,7 +277,17 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
                   </span>
                 </div>
                 <div className={styles.colResult}>{this.getGridPreviewText(plan.Results) || '—'}</div>
-                <div className={styles.colLink}>{this.getGridPreviewText(plan.RelatedLinks) || '—'}</div>
+                <div className={styles.colLink}>
+                  {plan.RelatedLinks ? <a href={this.htmlToPlainText(plan.RelatedLinks) || '—'}>View</a> : "-" }
+                </div>
+                <div className={styles.colAction}>
+                  <Icon
+                    iconName="View"
+                    className={styles.editIcon}
+                    onClick={() => this.openDetailPanel(plan)}
+                    title="View Detail"
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -284,7 +320,7 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
 
                 <div className={styles.acBody}>
                   {item.Data ? (
-                    <div className={styles.acText}><img src={item.Data} /></div>
+                    <div className={styles.acText}><img className={styles.acImg} src={item.Data} /></div>
                   ) : (
                     <div className={styles.emptyMessage}>No data available for {item.Year}.</div>
                   )}
@@ -294,6 +330,74 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
           </div>
         )}
       </div>
+    );
+  }
+
+  private renderDetailPanel(): JSX.Element {
+    const { selectedActionPlan, isDetailPanelOpen, isLoadingDetail } = this.state;
+    if (!isDetailPanelOpen || !selectedActionPlan) return <></>;
+
+    return (
+      <Modal
+        isOpen={isDetailPanelOpen}
+        onDismiss={this.closeDetailPanel}
+        isBlocking={false}
+        containerClassName={styles.modalContainer}
+      >
+        <div className={styles.detailPanel}>
+          <div className={styles.panelHeader}>
+            <h2>Action Plan Details</h2>
+            <button className={styles.closeBtn} onClick={this.closeDetailPanel}>
+              <Icon iconName="Cancel" />
+            </button>
+          </div>
+
+          {isLoadingDetail ? (
+            <div className={styles.spinnerContainer}>
+              <Spinner size={SpinnerSize.medium} label="Loading details..." />
+            </div>
+          ) : (
+            <div className={styles.panelBody}>
+              <div className={styles.formGroup}>
+                <label>Customer Feedback</label>
+                <div className={styles.readOnlyValue} dangerouslySetInnerHTML={{ __html: selectedActionPlan.UpdatedFeedback || '—' }} />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Service</label>
+                <div className={styles.readOnlyText}>{selectedActionPlan.Service || '—'}</div>
+              </div>
+              <div className={styles.formGroup}>
+                <label>PIC</label>
+                <div className={styles.readOnlyText}>{selectedActionPlan.PIC?.Title || '—'}</div>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Actions</label>
+                <div className={styles.readOnlyValue} dangerouslySetInnerHTML={{ __html: selectedActionPlan.Actions || '—' }} />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Timeline</label>
+                <div className={styles.readOnlyText}>{this.formatDate(selectedActionPlan.Timeline)}</div>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Status</label>
+                <span className={`${styles.badge} ${this.getStatusClass(selectedActionPlan.Status)}`}>
+                  {selectedActionPlan.Status || 'Open'}
+                </span>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Results</label>
+                <div className={styles.readOnlyValue} dangerouslySetInnerHTML={{ __html: selectedActionPlan.Results || '—' }} />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Related Links</label>
+                <div className={styles.readOnlyText}>
+                  {selectedActionPlan.RelatedLinks ? <a href={selectedActionPlan.RelatedLinks}>{selectedActionPlan.RelatedLinks}</a> : "-" }
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
     );
   }
 
@@ -315,6 +419,7 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
         <div className={styles.content}>
           <div className={styles.filterSection}>
             <div className={styles.filterGroup}>
+              <label htmlFor="results-year-filter">Please select a year to view data</label>
               <label htmlFor="results-year-filter">Year</label>
               <select
                 id="results-year-filter"
@@ -334,6 +439,7 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
           {this.renderResultsSection()}
           {!this.props.hideActionPlan && this.renderActionPlanGrid()}
         </div>
+        {this.renderDetailPanel()}
       </main>
     );
   }

@@ -19,7 +19,8 @@ export type ViewName =
   | 'dtsEngineeringTechnology'
   | 'dtsEnterpriseApplications'
   | 'dtsESTechnology'
-  | 'dtsResidential';
+  | 'dtsResidential'
+  | 'guide';
 
 export interface ISidebarProps {
   isTeamLeader: boolean;
@@ -176,23 +177,18 @@ export default class Sidebar extends React.Component<ISidebarProps, ISidebarStat
             {!isSidebarCollapsed && <div className={styles.navGroupTitle}>Home</div>}
             {this.renderNavItem('Home', 'Home', 'home')}
             {this.renderNavItem('Info', 'Learn More', 'about')}
+            {this.renderNavItem('BookAnswers', 'User Guide', 'guide')}
           </div>
 
           {/* Results section - shown to all */}
           <div className={styles.navGroup}>
-            {!isSidebarCollapsed && <div className={styles.navGroupTitle}>RESULTS</div>}
+            {!isSidebarCollapsed && <div className={styles.navGroupTitle}> SURVEY RESULTS</div>}
             {this.renderNavItem('CompanyDirectory', 'ESVN', 'esvn')}
             {this.renderNavItemWithSubmenu('BusinessCenterLogo', 'Internal & Sales Support', 'iss', [
               { label: 'Internal Support', view: 'is' },
               { label: 'Sales Support', view: 'ss' }
             ])}
-            {this.renderNavItemWithSubmenu('CloudImportExport', 'Digital Technology Support', 'dts', [
-              { label: 'Component Manufacturing', view: 'dtsComponentManufacturing' },
-              { label: 'Engineering Technology', view: 'dtsEngineeringTechnology' },
-              { label: 'Enterprise Applications', view: 'dtsEnterpriseApplications' },
-              { label: 'ES Technology', view: 'dtsESTechnology' },
-              { label: 'Residential', view: 'dtsResidential' }
-            ])}
+            {this.renderNavItem('CloudImportExport', 'Digital Technology Support', 'dts')}
           </div>
 
           {/* Comment & Action Plan - shown to leader, manager and admin */}

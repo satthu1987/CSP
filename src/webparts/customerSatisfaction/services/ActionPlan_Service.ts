@@ -75,18 +75,7 @@ export class ActionPlanService {
         `&$filter=Service eq '${service}'` +
         `&$orderby=Timeline desc`;
 
-      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
-        endpoint,
-        SPHttpClient.configurations.v1
-      );
-
-      if (!response.ok) {
-        console.error('Failed to fetch action plans');
-        return [];
-      }
-
-      const data = await response.json();
-      return Array.isArray(data.value) ? (data.value as IActionplan[]) : [];
+      return await this.fetchActionPlans(endpoint);
     } catch (error) {
       console.error('ActionPlanService getActionPlansByService error:', error);
       return [];
@@ -116,18 +105,7 @@ export class ActionPlanService {
         `&$filter=${filters}` +
         `&$orderby=Timeline desc`;
 
-      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
-        endpoint,
-        SPHttpClient.configurations.v1
-      );
-
-      if (!response.ok) {
-        console.error('Failed to fetch action plans by services');
-        return [];
-      }
-
-      const data = await response.json();
-      return Array.isArray(data.value) ? (data.value as IActionplan[]) : [];
+      return await this.fetchActionPlans(endpoint);
     } catch (error) {
       console.error('ActionPlanService getActionPlansByServices error:', error);
       return [];
@@ -142,19 +120,11 @@ export class ActionPlanService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items(${id})` +
-        `?$select=Id,Title,Service,CustomerFeedback,UpdatedFeedback,Actions,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
+        `?$select=Id,Title,Service,CustomerFeedback,UpdatedFeedback,Actions,PICId,PIC/EMail,PIC/Title,Timeline,Status,Results,RelatedLinks,Year,Category,ProductLine,Department,Division` +
         `&$expand=PIC`;
 
-      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
-        endpoint,
-        SPHttpClient.configurations.v1
-      );
-
-      if (!response.ok) {
-        return undefined;
-      }
-
-      return (await response.json()) as IActionplan;
+      const rows = await this.fetchActionPlans(endpoint);
+      return rows.length > 0 ? rows[0] : undefined;
     } catch (error) {
       console.error('ActionPlanService getActionPlanById error:', error);
       return undefined;
@@ -340,6 +310,99 @@ export class ActionPlanService {
    }
 
   /**
+   * Fetches action plan items and normalizes the PIC value. The expanded PIC
+   * can come back as an object, an array (multi-person field) or be missing
+   * even though PICId is set; in the last case the user is resolved by id.
+   */
+  private async fetchActionPlans(endpoint: string): Promise<IActionplan[]> {
+    const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+      endpoint,
+      SPHttpClient.configurations.v1
+    );
+
+    if (!response.ok) {
+      throw new Error(`Action plan list request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    const rows = (Array.isArray(data?.value)
+      ? data.value
+      : (Array.isArray(data?.d?.results) ? data.d.results : [])) as IActionplan[];
+
+    await this.resolveMissingPIC(rows);
+    return rows;
+  }
+
+  private normalizePICValue(value: unknown): { Title: string; EMail: string } | undefined {
+    if (Array.isArray(value)) {
+      return this.normalizePICValue(value[0]);
+    }
+
+    if (value && typeof value === 'object') {
+      const pic = value as { Title?: unknown; EMail?: unknown };
+      const title = typeof pic.Title === 'string' ? pic.Title.trim() : '';
+      const email = typeof pic.EMail === 'string' ? pic.EMail.trim() : '';
+      if (title || email) {
+        return { Title: title, EMail: email };
+      }
+    }
+
+    return undefined;
+  }
+
+  private async resolveMissingPIC(plans: IActionplan[]): Promise<void> {
+    const missingUserIds: number[] = [];
+    plans.forEach(plan => {
+      plan.PIC = this.normalizePICValue(plan.PIC);
+      if (!plan.PIC && typeof plan.PICId === 'number' && missingUserIds.indexOf(plan.PICId) === -1) {
+        missingUserIds.push(plan.PICId);
+      }
+    });
+
+    if (missingUserIds.length === 0) {
+      return;
+    }
+
+    const resolvedUsers = await Promise.all(missingUserIds.map(async userId => {
+      try {
+        const endpoint =
+          `${this.context.pageContext.web.absoluteUrl}` +
+          `/_api/web/getuserbyid(${userId})?$select=Id,Title,Email`;
+        const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+          endpoint,
+          SPHttpClient.configurations.v1
+        );
+
+        if (!response.ok) {
+          console.warn(`Failed to resolve PIC user ${userId}:`, response.status);
+          return undefined;
+        }
+
+        const user = await response.json() as { Title?: string; Email?: string };
+        const title = (user.Title || '').trim();
+        const email = (user.Email || '').trim();
+        return (title || email) ? { Title: title, EMail: email } : undefined;
+      } catch (error) {
+        console.error(`ActionPlanService resolveMissingPIC error for user id ${userId}:`, error);
+        return undefined;
+      }
+    }));
+
+    const userMap: { [id: number]: { Title: string; EMail: string } } = {};
+    resolvedUsers.forEach((user, index) => {
+      if (user) {
+        userMap[missingUserIds[index]] = user;
+      }
+    });
+
+    plans.forEach(plan => {
+      if (!plan.PIC && typeof plan.PICId === 'number' && userMap[plan.PICId]) {
+        plan.PIC = userMap[plan.PICId];
+      }
+    });
+  }
+
+  /**
    * Gets all action plans (no filter - for admin use).
    */
   public async getAllActionPlans(): Promise<IActionplan[]> {
@@ -351,18 +414,7 @@ export class ActionPlanService {
         `&$expand=PIC` +
         `&$orderby=Timeline desc`;
 
-      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
-        endpoint,
-        SPHttpClient.configurations.v1
-      );
-
-      if (!response.ok) {
-        console.error('Failed to fetch all action plans');
-        return [];
-      }
-
-      const data = await response.json();
-      return Array.isArray(data.value) ? (data.value as IActionplan[]) : [];
+      return await this.fetchActionPlans(endpoint);
     } catch (error) {
       console.error('ActionPlanService getAllActionPlans error:', error);
       return [];
@@ -382,18 +434,7 @@ export class ActionPlanService {
         `&$filter=Department eq '${department.replace(/'/g, "''")}'` +
         `&$orderby=Timeline desc`;
 
-      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
-        endpoint,
-        SPHttpClient.configurations.v1
-      );
-
-      if (!response.ok) {
-        console.error('Failed to fetch action plans by department');
-        return [];
-      }
-
-      const data = await response.json();
-      return Array.isArray(data.value) ? (data.value as IActionplan[]) : [];
+      return await this.fetchActionPlans(endpoint);
     } catch (error) {
       console.error('ActionPlanService getActionPlansByDepartment error:', error);
       return [];
