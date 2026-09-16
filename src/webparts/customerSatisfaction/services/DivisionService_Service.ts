@@ -15,7 +15,7 @@ export class DivisionServiceService {
     return value.replace(/'/g, "''");
   }
 
-  private async updateListItem(itemId: number, payload: Partial<{ PICId: number | null; ManagerId: number | null; Division: string; Service: string; Year: string }>): Promise<boolean> {
+  private async updateListItem(itemId: number, payload: { [key: string]: unknown }): Promise<boolean> {
     const endpoint =
       `${this.context.pageContext.web.absoluteUrl}` +
       `/_api/web/lists/getbytitle('${this.listName}')/items(${itemId})`;
@@ -148,10 +148,11 @@ export class DivisionServiceService {
   }
 
   /**
-   * Gets services (with Id and PIC) for a given division. The Id is needed to
-   * subsequently look up the Service field's version history.
+   * Gets services (with Id, PIC and Manager) for a given division. The Id is needed to
+   * subsequently look up the Service field's version history. PIC and Manager are
+   * multi-user fields, so all assigned users are resolved and joined for display.
    */
-  public async getServicesWithIdByDivision(division: string, year?: string): Promise<Array<{ Id: number; Service: string; PIC?: string }>> {
+  public async getServicesWithIdByDivision(division: string, year?: string): Promise<Array<{ Id: number; Service: string; PIC?: string; Manager?: string }>> {
     if (!division) {
       return [];
     }
@@ -165,7 +166,8 @@ export class DivisionServiceService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Service,PICId,PIC/Title&$filter=${filter}&$orderby=Service asc&$expand=PIC`;
+        `?$select=Id,Service,PICId,PIC/Title,PIC/EMail,ManagerId,Manager/Title,Manager/EMail` +
+        `&$filter=${filter}&$orderby=Service asc&$expand=PIC,Manager`;
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.get(
         endpoint,
@@ -179,24 +181,28 @@ export class DivisionServiceService {
 
       const data = await response.json();
       const rows = Array.isArray(data.value)
-        ? (data.value as Array<{ Id: number; Service?: string; PICId?: number; PIC?: { Title?: string } | Array<{ Title?: string }> }>)
+        ? (data.value as Array<{
+            Id: number;
+            Service?: string;
+            PICId?: number | number[];
+            PIC?: { Title?: string; EMail?: string } | Array<{ Title?: string; EMail?: string }>;
+            ManagerId?: number | number[];
+            Manager?: { Title?: string; EMail?: string } | Array<{ Title?: string; EMail?: string }>;
+          }>)
         : [];
 
       const results = await Promise.all(
         rows
           .filter(row => (row.Service || '').trim())
           .map(async row => {
-            const picValue = Array.isArray(row.PIC) ? row.PIC[0] : row.PIC;
-            let pic = picValue?.Title;
-
-            if (!pic && row.PICId) {
-              pic = await this.getUserTitleById(row.PICId);
-            }
+            const picUsers = await this.resolveAllUserDetails(row.PIC, row.PICId);
+            const managerUsers = await this.resolveAllUserDetails(row.Manager, row.ManagerId);
 
             return {
               Id: row.Id,
               Service: (row.Service || '').trim(),
-              PIC: pic,
+              PIC: picUsers.map(u => u.Title).filter(Boolean).join(', ') || undefined,
+              Manager: managerUsers.map(u => u.Title).filter(Boolean).join(', ') || undefined,
             };
           })
       );
@@ -208,50 +214,50 @@ export class DivisionServiceService {
     }
   }
 
-  /** Fallback lookup: resolves a user's display name by SharePoint user Id when $expand doesn't yield one. */
-  private async getUserTitleById(userId: number): Promise<string | undefined> {
-    try {
-      const endpoint =
-        `${this.context.pageContext.web.absoluteUrl}` +
-        `/_api/web/getuserbyid(${userId})`;
-
-      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
-        endpoint,
-        SPHttpClient.configurations.v1
-      );
-
-      if (!response.ok) {
-        return undefined;
-      }
-
-      const data = await response.json();
-      return data?.Title;
-    } catch (error) {
-      console.error('DivisionServiceService getUserTitleById error:', error);
-      return undefined;
+  /** Normalizes a person field's id value to an array of user ids (handles both single and multi-value fields). */
+  private allUserIds(value: number | number[] | undefined): number[] {
+    if (Array.isArray(value)) {
+      return value;
     }
+    return value !== undefined && value !== null ? [value] : [];
+  }
+
+  /** Normalizes an expanded person field value to an array of user objects (handles both single and multi-value fields). */
+  private allExpandedUsers(
+    value: { Title?: string; EMail?: string } | Array<{ Title?: string; EMail?: string }> | undefined
+  ): Array<{ Title?: string; EMail?: string }> {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    return value ? [value] : [];
   }
 
   /**
-   * Expanded person fields can come back as an object, an array (multi-person
-   * field) or be missing even though the id is set; this normalizes the value
-   * to a single user object.
+   * Resolves ALL users assigned to a (possibly multi-value) person field, matching each
+   * id to its expanded Title/EMail when available and falling back to a lookup by id
+   * when the expansion is missing or incomplete.
    */
-  private normalizeExpandedUser(
-    value: { Title?: string; EMail?: string } | Array<{ Title?: string; EMail?: string }> | undefined
-  ): { Title?: string; EMail?: string } | undefined {
-    if (Array.isArray(value)) {
-      return value.length > 0 ? value[0] : undefined;
-    }
-    return value;
-  }
+  private async resolveAllUserDetails(
+    expanded: { Title?: string; EMail?: string } | Array<{ Title?: string; EMail?: string }> | undefined,
+    ids: number | number[] | undefined
+  ): Promise<Array<{ Id: number; Title: string; EMail: string }>> {
+    const userIds = this.allUserIds(ids);
+    const expandedUsers = this.allExpandedUsers(expanded);
 
-  /** Returns the first user id when the person field id comes back as an array (multi-person field). */
-  private firstUserId(value: number | number[] | undefined): number | undefined {
-    if (Array.isArray(value)) {
-      return value.length > 0 ? value[0] : undefined;
-    }
-    return value;
+    return Promise.all(
+      userIds.map(async (id, index) => {
+        let title = (expandedUsers[index]?.Title || '').trim();
+        let email = (expandedUsers[index]?.EMail || '').trim();
+
+        if (!title || !email) {
+          const details = await this.getUserDetailsById(id);
+          title = title || (details?.Title || '');
+          email = email || (details?.EMail || '');
+        }
+
+        return { Id: id, Title: title, EMail: email };
+      })
+    );
   }
 
   /** Fallback lookup: resolves a user's Title and EMail by SharePoint user Id. */
@@ -277,29 +283,6 @@ export class DivisionServiceService {
       console.error('DivisionServiceService getUserDetailsById error:', error);
       return undefined;
     }
-  }
-
-  /**
-   * Resolves a person field's Title/EMail from the expanded value, falling back
-   * to a lookup by id when the expansion is missing or incomplete.
-   */
-  private async resolveUserDetails(
-    expanded: { Title?: string; EMail?: string } | Array<{ Title?: string; EMail?: string }> | undefined,
-    userId: number | number[] | undefined
-  ): Promise<{ Title?: string; EMail?: string } | undefined> {
-    const user = this.normalizeExpandedUser(expanded);
-    const fallbackId = this.firstUserId(userId);
-
-    let title = (user?.Title || '').trim();
-    let email = (user?.EMail || '').trim();
-
-    if ((!title || !email) && fallbackId !== undefined) {
-      const details = await this.getUserDetailsById(fallbackId);
-      title = title || (details?.Title || '');
-      email = email || (details?.EMail || '');
-    }
-
-    return title || email ? { Title: title, EMail: email } : undefined;
   }
 
   /** Gets the distinct set of Year values present in the Division_Service list. */
@@ -338,18 +321,14 @@ export class DivisionServiceService {
     }
   }
 
-  /** Gets all Division_Service items (optionally filtered by Year) for management purposes. */
+  /** Gets all Division_Service items (optionally filtered by Year) for management purposes. PIC and Manager are multi-user fields, so all assigned users are returned. */
   public async getAllItemsWithDetails(year?: string): Promise<Array<{
     Id: number;
     Division: string;
     Service: string;
     Year: string;
-    PICId?: number;
-    PICTitle?: string;
-    PICEmail?: string;
-    ManagerId?: number;
-    ManagerTitle?: string;
-    ManagerEmail?: string;
+    PICUsers: Array<{ Id: number; Title: string; EMail: string }>;
+    ManagerUsers: Array<{ Id: number; Title: string; EMail: string }>;
   }>> {
     try {
       const filter = year ? `?$filter=Year eq '${this.escapeODataValue(year)}'&` : '?';
@@ -383,20 +362,16 @@ export class DivisionServiceService {
         : [];
 
       const results = await Promise.all(rows.map(async row => {
-        const pic = await this.resolveUserDetails(row.PIC, row.PICId);
-        const manager = await this.resolveUserDetails(row.Manager, row.ManagerId);
+        const picUsers = await this.resolveAllUserDetails(row.PIC, row.PICId);
+        const managerUsers = await this.resolveAllUserDetails(row.Manager, row.ManagerId);
 
         return {
           Id: row.Id,
           Division: row.Division || '',
           Service: row.Service || '',
           Year: row.Year || '',
-          PICId: this.firstUserId(row.PICId),
-          PICTitle: pic?.Title,
-          PICEmail: pic?.EMail,
-          ManagerId: this.firstUserId(row.ManagerId),
-          ManagerTitle: manager?.Title,
-          ManagerEmail: manager?.EMail,
+          PICUsers: picUsers,
+          ManagerUsers: managerUsers,
         };
       }));
 
@@ -407,10 +382,10 @@ export class DivisionServiceService {
     }
   }
 
-  /** Updates Division, Service, Year and/or PIC for a Division_Service item. */
+  /** Updates Division, Service, Year and/or PIC/Manager (multi-user) for a Division_Service item. */
   public async updateItemDetails(
     itemId: number,
-    payload: { division?: string; service?: string; year?: string; picId?: number; managerId?: number }
+    payload: { division?: string; service?: string; year?: string; picIds?: number[]; managerIds?: number[] }
   ): Promise<boolean> {
     const updatePayload: { [key: string]: unknown } = {};
     if (payload.division !== undefined) {
@@ -422,13 +397,13 @@ export class DivisionServiceService {
     if (payload.year !== undefined) {
       updatePayload.Year = payload.year;
     }
-    if (payload.picId !== undefined) {
-      updatePayload.PICId = payload.picId;
+    if (payload.picIds !== undefined) {
+      updatePayload.PICId = payload.picIds;
     }
-    if (payload.managerId !== undefined) {
-      updatePayload.ManagerId = payload.managerId;
+    if (payload.managerIds !== undefined) {
+      updatePayload.ManagerId = payload.managerIds;
     }
-    return this.updateListItem(itemId, updatePayload as Partial<{ Division: string; Service: string; Year: string; PICId: number; ManagerId: number }>);
+    return this.updateListItem(itemId, updatePayload);
   }
 
   /**
@@ -687,6 +662,11 @@ export class DivisionServiceService {
     }
   }
 
+  /**
+   * Adds the given user as Manager (multi-user field) on every Division_Service item
+   * belonging to the given divisions. Existing PIC/Manager assignments on those items
+   * are preserved — the user is only appended if not already present.
+   */
   public async assignManagerToDivisions(userId: number, divisions: string[]): Promise<boolean> {
     try {
       for (const division of divisions) {
@@ -694,7 +674,7 @@ export class DivisionServiceService {
         const endpoint =
           `${this.context.pageContext.web.absoluteUrl}` +
           `/_api/web/lists/getbytitle('${this.listName}')/items` +
-          `?$select=Id&$filter=Division eq '${escapedDivision}'`;
+          `?$select=Id,ManagerId&$filter=Division eq '${escapedDivision}'`;
 
         const response: SPHttpClientResponse = await this.context.spHttpClient.get(
           endpoint,
@@ -707,10 +687,19 @@ export class DivisionServiceService {
         }
 
         const data = await response.json();
-        const rows = Array.isArray(data.value) ? (data.value as Array<{ Id: number }>) : [];
+        const rows = Array.isArray(data.value)
+          ? (data.value as Array<{ Id: number; ManagerId?: number | number[] }>)
+          : [];
 
         for (const row of rows) {
-          const updated = await this.updateListItem(row.Id, { ManagerId: userId });
+          const existingIds = this.allUserIds(row.ManagerId);
+          if (existingIds.indexOf(userId) !== -1) {
+            continue;
+          }
+
+          const updated = await this.updateListItem(row.Id, {
+            ManagerId: [...existingIds, userId],
+          });
           if (!updated) {
             return false;
           }
@@ -724,6 +713,11 @@ export class DivisionServiceService {
     }
   }
 
+  /**
+   * Adds the given user as PIC (multi-user field) on every Division_Service item
+   * belonging to the given services. Existing PIC/Manager assignments on those items
+   * are preserved — the user is only appended if not already present.
+   */
   public async assignLeaderToServices(userId: number, services: string[]): Promise<boolean> {
     try {
       for (const service of services) {
@@ -731,7 +725,7 @@ export class DivisionServiceService {
         const endpoint =
           `${this.context.pageContext.web.absoluteUrl}` +
           `/_api/web/lists/getbytitle('${this.listName}')/items` +
-          `?$select=Id&$filter=Service eq '${escapedService}'`;
+          `?$select=Id,PICId&$filter=Service eq '${escapedService}'`;
 
         const response: SPHttpClientResponse = await this.context.spHttpClient.get(
           endpoint,
@@ -744,10 +738,19 @@ export class DivisionServiceService {
         }
 
         const data = await response.json();
-        const rows = Array.isArray(data.value) ? (data.value as Array<{ Id: number }>) : [];
+        const rows = Array.isArray(data.value)
+          ? (data.value as Array<{ Id: number; PICId?: number | number[] }>)
+          : [];
 
         for (const row of rows) {
-          const updated = await this.updateListItem(row.Id, { PICId: userId });
+          const existingIds = this.allUserIds(row.PICId);
+          if (existingIds.indexOf(userId) !== -1) {
+            continue;
+          }
+
+          const updated = await this.updateListItem(row.Id, {
+            PICId: [...existingIds, userId],
+          });
           if (!updated) {
             return false;
           }

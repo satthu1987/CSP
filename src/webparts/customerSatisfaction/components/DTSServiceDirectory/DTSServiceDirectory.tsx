@@ -3,6 +3,7 @@ import { Spinner, SpinnerSize, Icon } from '@fluentui/react';
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import styles from './DTSServiceDirectory.module.scss';
 import { DivisionServiceService } from '../../services/DivisionService_Service';
+import { AcDataService, IAcDataItem } from '../../services/AcDataService';
 
 export interface IDTSServiceDirectoryProps {
   context: WebPartContext;
@@ -13,6 +14,7 @@ interface IDTSServiceItem {
   Id?: number;
   Service: string;
   PIC?: string;
+  Manager?: string;
 }
 
 interface IDTSDivisionGroup {
@@ -27,6 +29,8 @@ interface IDTSServiceDirectoryState {
   loadingServiceKey?: string;
   selectedYear: string;
   availableYears: string[];
+  acItems: IAcDataItem[];
+  isLoadingResult: boolean;
 }
 
 const DTS_DIVISIONS: string[] = [
@@ -45,6 +49,7 @@ export default class DTSServiceDirectory extends React.Component<
   IDTSServiceDirectoryState
 > {
   private divisionServiceService: DivisionServiceService;
+  private acDataService: AcDataService;
 
   constructor(props: IDTSServiceDirectoryProps) {
     super(props);
@@ -58,8 +63,11 @@ export default class DTSServiceDirectory extends React.Component<
       expandedDivisions,
       selectedYear: currentYear,
       availableYears: [currentYear],
+      acItems: [],
+      isLoadingResult: true,
     };
     this.divisionServiceService = new DivisionServiceService(props.context, 'Division_Service');
+    this.acDataService = new AcDataService(props.context);
   }
 
   public async componentDidMount(): Promise<void> {
@@ -82,9 +90,10 @@ export default class DTSServiceDirectory extends React.Component<
   };
 
   private loadItems = async (year: string): Promise<void> => {
-    this.setState({ isLoading: true });
+    this.setState({ isLoading: true, isLoadingResult: true });
 
     try {
+      const acDataPromise = this.acDataService.getAcDataByDepartment(RESULT_DEPARTMENT);
       const groups: IDTSDivisionGroup[] = [];
 
       for (const division of DTS_DIVISIONS) {
@@ -94,10 +103,17 @@ export default class DTSServiceDirectory extends React.Component<
         }
       }
 
-      this.setState({ isLoading: false, groups });
+      const acItems = await acDataPromise;
+
+      this.setState({
+        isLoading: false,
+        isLoadingResult: false,
+        groups,
+        acItems: acItems.filter(item => (item.Year || '').toString() === year),
+      });
     } catch (error) {
       console.error('Failed to load Digital Technology Support directory:', error);
-      this.setState({ isLoading: false, groups: [] });
+      this.setState({ isLoading: false, isLoadingResult: false, groups: [], acItems: [] });
     }
   };
 
@@ -137,6 +153,42 @@ export default class DTSServiceDirectory extends React.Component<
     }
   };
 
+  private renderOverallResultSection = (): JSX.Element => {
+    const { acItems, isLoadingResult, selectedYear } = this.state;
+
+    return (
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>Digital Technology Support - {selectedYear} Overall Result</h2>
+
+        {isLoadingResult ? (
+          <div className={styles.spinnerContainer}>
+            <Spinner size={SpinnerSize.large} label="Loading results..." />
+          </div>
+        ) : acItems.length === 0 ? (
+          <div className={styles.emptyMessage}>No result data available for Digital Technology Support.</div>
+        ) : (
+          <div className={styles.acDataSection}>
+            {acItems.map(item => (
+              <div className={styles.acRow} key={item.Id}>
+                <div className={styles.acHeader}>
+                  <span className={styles.acTitle}>{item.Year} Overall Result</span>
+                </div>
+
+                <div className={styles.acBody}>
+                  {item.Data ? (
+                    <div className={styles.acText}><img className={styles.acImg} src={item.Data} /></div>
+                  ) : (
+                    <div className={styles.emptyMessage}>No data available for {item.Year}.</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   public render(): JSX.Element {
     const { isLoading, groups, expandedDivisions, loadingServiceKey, selectedYear, availableYears } = this.state;
 
@@ -153,7 +205,7 @@ export default class DTSServiceDirectory extends React.Component<
         <div className={styles.content}>
           <div className={styles.filterSection}>
             <div className={styles.filterGroup}>
-              <label htmlFor="dts-directory-year-filter">Year</label>
+              <label htmlFor="dts-directory-year-filter">Please select a year to view data</label>
               <select
                 id="dts-directory-year-filter"
                 className={styles.filterSelect}
@@ -168,6 +220,8 @@ export default class DTSServiceDirectory extends React.Component<
               </select>
             </div>
           </div>
+
+          {this.renderOverallResultSection()}
 
           <div className={styles.gridContainer}>
             {isLoading ? (
@@ -200,6 +254,7 @@ export default class DTSServiceDirectory extends React.Component<
                         <div className={styles.serviceHeaderRow}>
                           <div>Service</div>
                           <div>Service/Project Lead</div>
+                          {/* <div>Manager</div> */}
                           <div>Result</div>
                         </div>
                         {group.services.map((item, index) => {
@@ -210,6 +265,7 @@ export default class DTSServiceDirectory extends React.Component<
                             <div className={styles.serviceRow} key={`${key}-${index}`}>
                               <div>{item.Service}</div>
                               <div>{item.PIC || '-'}</div>
+                              {/* <div>{item.Manager || '-'}</div> */}
                               <div>
                                 <button
                                   type="button"

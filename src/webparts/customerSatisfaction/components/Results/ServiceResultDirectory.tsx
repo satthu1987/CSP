@@ -3,6 +3,7 @@ import { Spinner, SpinnerSize } from '@fluentui/react';
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import styles from './ServiceResultDirectory.module.scss';
 import { DivisionServiceService } from '../../services/DivisionService_Service';
+import { AcDataService, IAcDataItem } from '../../services/AcDataService';
 
 export interface IServiceResultDirectoryProps {
   context: WebPartContext;
@@ -17,7 +18,8 @@ interface IServiceResultDirectoryItem {
   Id?: number;
   Division: string;
   Service: string;
-PIC?: string;
+  PIC?: string;
+  Manager?: string;
 }
 
 interface IServiceResultDirectoryState {
@@ -26,6 +28,8 @@ interface IServiceResultDirectoryState {
   loadingServiceKey?: string;
   selectedYear: string;
   availableYears: string[];
+  acItems: IAcDataItem[];
+  isLoadingResult: boolean;
 }
 
 export default class ServiceResultDirectory extends React.Component<
@@ -33,6 +37,7 @@ export default class ServiceResultDirectory extends React.Component<
   IServiceResultDirectoryState
 > {
   private divisionServiceService: DivisionServiceService;
+  private acDataService: AcDataService;
 
   constructor(props: IServiceResultDirectoryProps) {
     super(props);
@@ -42,8 +47,11 @@ export default class ServiceResultDirectory extends React.Component<
       items: [],
       selectedYear: currentYear,
       availableYears: [currentYear],
+      acItems: [],
+      isLoadingResult: true,
     };
     this.divisionServiceService = new DivisionServiceService(props.context, 'Division_Service');
+    this.acDataService = new AcDataService(props.context);
   }
 
   public async componentDidMount(): Promise<void> {
@@ -75,22 +83,36 @@ export default class ServiceResultDirectory extends React.Component<
   };
 
   private loadItems = async (divisions: string[], year: string): Promise<void> => {
-    this.setState({ isLoading: true });
+    this.setState({ isLoading: true, isLoadingResult: true });
 
     try {
+      const acDataPromise = this.acDataService.getAcDataByDepartment(this.props.resultDepartment);
       const result: IServiceResultDirectoryItem[] = [];
 
       for (const division of divisions) {
         const services = await this.divisionServiceService.getServicesWithIdByDivision(division, year);
         services.forEach(service => {
-          result.push({ Id: service.Id, Division: division, Service: service.Service, PIC: service.PIC });
+          result.push({
+            Id: service.Id,
+            Division: division,
+            Service: service.Service,
+            PIC: service.PIC,
+            Manager: service.Manager,
+          });
         });
       }
 
-      this.setState({ isLoading: false, items: result });
+      const acItems = await acDataPromise;
+
+      this.setState({
+        isLoading: false,
+        isLoadingResult: false,
+        items: result,
+        acItems: acItems.filter(item => (item.Year || '').toString() === year),
+      });
     } catch (error) {
       console.error('Failed to load Division_Service directory:', error);
-      this.setState({ isLoading: false, items: [] });
+      this.setState({ isLoading: false, isLoadingResult: false, items: [], acItems: [] });
     }
   };
 
@@ -124,6 +146,43 @@ export default class ServiceResultDirectory extends React.Component<
     }
   };
 
+  private renderOverallResultSection = (): JSX.Element => {
+    const { title, resultDepartment } = this.props;
+    const { acItems, isLoadingResult, selectedYear } = this.state;
+
+    return (
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>{title} - {selectedYear} Overall Result</h2>
+
+        {isLoadingResult ? (
+          <div className={styles.spinnerContainer}>
+            <Spinner size={SpinnerSize.large} label="Loading results..." />
+          </div>
+        ) : acItems.length === 0 ? (
+          <div className={styles.emptyMessage}>No result data available for {resultDepartment}.</div>
+        ) : (
+          <div className={styles.acDataSection}>
+            {acItems.map(item => (
+              <div className={styles.acRow} key={item.Id}>
+                <div className={styles.acHeader}>
+                  <span className={styles.acTitle}>{item.Year} Overall Result</span>
+                </div>
+
+                <div className={styles.acBody}>
+                  {item.Data ? (
+                    <div className={styles.acText}><img className={styles.acImg} src={item.Data} /></div>
+                  ) : (
+                    <div className={styles.emptyMessage}>No data available for {item.Year}.</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   public render(): JSX.Element {
     const { title, resultDepartment, getResultDepartmentByDivision } = this.props;
     const { isLoading, items, loadingServiceKey, selectedYear, availableYears } = this.state;
@@ -141,7 +200,7 @@ export default class ServiceResultDirectory extends React.Component<
         <div className={styles.content}>
           <div className={styles.filterSection}>
             <div className={styles.filterGroup}>
-              <label htmlFor="service-directory-year-filter">Year</label>
+              <label htmlFor="service-directory-year-filter">Please select a year to view data</label>
               <select
                 id="service-directory-year-filter"
                 className={styles.filterSelect}
@@ -157,6 +216,8 @@ export default class ServiceResultDirectory extends React.Component<
             </div>
           </div>
 
+          {this.renderOverallResultSection()}
+
           <div className={styles.gridContainer}>
             {isLoading ? (
               <div className={styles.spinnerContainer}>
@@ -169,6 +230,7 @@ export default class ServiceResultDirectory extends React.Component<
                 <div className={styles.gridHeader}>
                   <div>Service</div>
                   <div>Service/Project Lead</div>
+                  {/* <div>Manager</div> */}
                   <div>Result</div>
                 </div>
                 {items.map((item, index) => {
@@ -181,7 +243,8 @@ export default class ServiceResultDirectory extends React.Component<
                   return (
                     <div className={styles.gridRow} key={`${key}-${index}`}>
                       <div>{item.Service}</div>
-                      <div>{item.PIC}</div>
+                      <div>{item.PIC || '-'}</div>
+                      {/* <div>{item.Manager || '-'}</div> */}
                       <div>
                         <button
                           type="button"

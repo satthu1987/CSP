@@ -209,11 +209,6 @@ export default class Sidebar extends React.Component<ISidebarProps, ISidebarStat
             </div>
           )}
         </nav>
-
-        <button className={styles.signOutBtn}>
-          <Icon iconName="SignOut" />
-          {!isSidebarCollapsed && <span>Sign out</span>}
-        </button>
       </aside>
     );
   }

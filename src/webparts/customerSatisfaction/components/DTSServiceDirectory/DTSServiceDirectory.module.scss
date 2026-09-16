@@ -137,7 +137,7 @@
 .serviceHeaderRow,
 .serviceRow {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr;
+  grid-template-columns: 1.2fr 1fr 1fr;
   gap: 16px;
   padding: 12px 16px 12px 42px;
   align-items: center;
@@ -196,7 +196,84 @@
   height: 240px;
 }
 
+/* ── Overall Result Section (same style as Results) ── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f1f1f;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #ff5722;
+  display: inline-block;
+}
+
+.acDataSection {
+  margin: 0 auto;
+  width: 100%;
+}
+
+.acRow {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  background: #fff;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.acHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 16px 20px;
+  background: #f5f5f5;
+  text-align: left;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.acTitle {
+  flex: 1;
+}
+
+.acBody {
+  padding: 20px;
+  background: #fff;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+.acText {
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.acImg {
+  height: 80%;
+  width: 80%;
+  padding-left: 100px;
+}
+
 @media (max-width: 768px) {
+  .acBody {
+    min-height: 200px;
+  }
+
   .header {
     padding: 16px 24px;
   }
@@ -211,7 +288,7 @@
 
   .serviceHeaderRow,
   .serviceRow {
-    grid-template-columns: 1.5fr 1fr 1fr;
+    grid-template-columns: 1.2fr 1fr 1fr;
     gap: 8px;
     padding: 10px 12px 10px 28px;
     font-size: 12px;

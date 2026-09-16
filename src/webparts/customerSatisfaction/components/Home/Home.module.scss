@@ -31,18 +31,52 @@
   object-fit: contain;
 }
 
-.timelineImageContainer {
-  padding: 40px 40px;
-  display: flex;
-  justify-content: center;
-  background: #fafafa;
-  border-bottom: 1px solid #e0e0e0;
+.welcomeSection {
+  padding: 24px 40px 8px;
 }
 
-.timelineImage {
-  max-width: 100%;
-  max-height: 300px;
-  object-fit: contain;
+.welcomeText {
+  margin: 0;
+  color: #000000;
+  font-weight: normal;
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.howItWorksSection {
+  padding: 8px 40px 40px;
+}
+
+.sectionTitle {
+  margin: 0;
+  padding: 16px 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #ff5722;
+}
+
+.sectionBody {
+  padding: 0 0 16px 30px;
+  overflow-x: hidden;
+
+  p {
+    margin: 0 0 8px 0;
+    color: #555;
+    line-height: 1.6;
+    font-size: 14px;
+  }
+
+  img {
+    display: block;
+    max-width: 100% !important;
+    height: auto !important;
+    object-fit: contain;
+  }
+
+  figure {
+    max-width: 100%;
+    margin: 0;
+  }
 }
 
 .content {

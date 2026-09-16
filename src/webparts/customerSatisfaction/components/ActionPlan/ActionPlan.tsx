@@ -106,7 +106,19 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
       let userServices: string[] = [];
 
       if (filterMode === 'manager') {
-        userServices = await this.divisionServiceService.getServicesByManager(userEmail);
+        const divisions = await this.divisionServiceService.getDivisionsByManager(userEmail);
+        const servicesByDivision = await Promise.all(
+          divisions.map(division => this.divisionServiceService.getServicesByDivision(division))
+        );
+        const uniqueServices: string[] = [];
+        servicesByDivision.forEach(services => {
+          services.forEach(service => {
+            if (uniqueServices.indexOf(service) === -1) {
+              uniqueServices.push(service);
+            }
+          });
+        });
+        userServices = uniqueServices;
       } else if (filterMode === 'leader') {
         userServices = await this.divisionServiceService.getServicesByPIC(userEmail);
       }
@@ -485,7 +497,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
               </div>
 
               <div className={styles.filterGroup}>
-                <label>Year</label>
+                <label>Please select a year to view data</label>
                 <select
                   value={filterYear}
                   onChange={(e) => this.setState({ filterYear: e.target.value })}
@@ -575,7 +587,7 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
                     {this.getGridPreviewText(Array.isArray(plan.Results) ? plan.Results.join('\n') : (plan.Results as unknown as string))}
                   </div>
                   <div className={styles.colRelatedLinks}>
-                    {plan.RelatedLinks ? <a href={this.getGridPreviewText(plan.RelatedLinks) || '—'}>View</a> : "-" }
+                    {plan.RelatedLinks ? <a href={this.getGridPreviewText(plan.RelatedLinks) || '—'} target="_blank">View</a> : "-" }
                   </div>
                   <div className={styles.colAction}>
                     {!plan.Actions || plan.Actions.length === 0 ? (

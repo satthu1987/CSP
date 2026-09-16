@@ -9,29 +9,27 @@ export interface IDivisionServiceManagementProps {
   context: WebPartContext;
 }
 
+interface IPersonInfo {
+  Id: number;
+  Title: string;
+  EMail: string;
+}
+
 interface IDivisionServiceItem {
   Id: number;
   Division: string;
   Service: string;
   Year: string;
-  PICId?: number;
-  PICTitle?: string;
-  PICEmail?: string;
-  ManagerId?: number;
-  ManagerTitle?: string;
-  ManagerEmail?: string;
+  PICUsers: IPersonInfo[];
+  ManagerUsers: IPersonInfo[];
 }
 
 interface IFormData {
   division: string;
   service: string;
   year: string;
-  picId?: number;
-  picDisplayName?: string;
-  picEmail?: string;
-  managerId?: number;
-  managerDisplayName?: string;
-  managerEmail?: string;
+  picUsers: IPersonInfo[];
+  managerUsers: IPersonInfo[];
 }
 
 interface IDivisionServiceManagementState {
@@ -62,7 +60,7 @@ export default class DivisionServiceManagement extends React.Component<
       availableYears: [currentYear],
       isPanelOpen: false,
       selectedItem: undefined,
-      formData: { division: '', service: '', year: currentYear },
+      formData: { division: '', service: '', year: currentYear, picUsers: [], managerUsers: [] },
       isSaving: false,
       errorMsg: '',
     };
@@ -115,12 +113,8 @@ export default class DivisionServiceManagement extends React.Component<
         division: item.Division,
         service: item.Service,
         year: item.Year,
-        picId: item.PICId,
-        picDisplayName: item.PICTitle,
-        picEmail: item.PICEmail,
-        managerId: item.ManagerId,
-        managerDisplayName: item.ManagerTitle,
-        managerEmail: item.ManagerEmail,
+        picUsers: item.PICUsers,
+        managerUsers: item.ManagerUsers,
       },
       errorMsg: '',
     });
@@ -147,8 +141,8 @@ export default class DivisionServiceManagement extends React.Component<
       division: formData.division.trim(),
       service: formData.service.trim(),
       year: formData.year.trim(),
-      picId: formData.picId,
-      managerId: formData.managerId,
+      picIds: formData.picUsers.map(u => u.Id),
+      managerIds: formData.managerUsers.map(u => u.Id),
     });
 
     if (success) {
@@ -192,8 +186,8 @@ export default class DivisionServiceManagement extends React.Component<
             <div className={styles.colDivision}>{item.Division || '—'}</div>
             <div className={styles.colService}>{item.Service || '—'}</div>
             <div className={styles.colYear}>{item.Year || '—'}</div>
-            <div className={styles.colPIC}>{item.PICTitle || '—'}</div>
-            <div className={styles.colPIC}>{item.ManagerTitle || '—'}</div>
+            <div className={styles.colPIC}>{item.PICUsers.map(u => u.Title).join(', ') || '—'}</div>
+            <div className={styles.colPIC}>{item.ManagerUsers.map(u => u.Title).join(', ') || '—'}</div>
             <div className={styles.colAction}>
               <button
                 className={styles.editIcon}
@@ -218,8 +212,8 @@ export default class DivisionServiceManagement extends React.Component<
       spHttpClient: this.props.context.spHttpClient,
     };
 
-    const defaultUsers = formData.picEmail ? [formData.picEmail] : [];
-    const defaultManagerUsers = formData.managerEmail ? [formData.managerEmail] : [];
+    const defaultUsers = formData.picUsers.map(u => u.EMail).filter(Boolean);
+    const defaultManagerUsers = formData.managerUsers.map(u => u.EMail).filter(Boolean);
 
     return (
       <Modal
@@ -272,28 +266,20 @@ export default class DivisionServiceManagement extends React.Component<
               <PeoplePicker
                 key={String(this.state.selectedItem?.Id)}
                 context={peoplePickerContext}
-                personSelectionLimit={1}
                 groupName=""
                 ensureUser={true}
                 principalTypes={[PrincipalType.User]}
                 defaultSelectedUsers={defaultUsers}
                 onChange={(items: IPersonaProps[]) => {
-                  if (items.length > 0) {
-                    const rawId = items[0].id;
-                    const picId = rawId ? Number(rawId) : undefined;
-                    this.setState({
-                      formData: {
-                        ...formData,
-                        picId: picId && !isNaN(picId) ? picId : undefined,
-                        picDisplayName: items[0].text || '',
-                        picEmail: items[0].secondaryText || '',
-                      },
-                    });
-                  } else {
-                    this.setState({
-                      formData: { ...formData, picId: undefined, picDisplayName: '', picEmail: '' },
-                    });
-                  }
+                  const picUsers: IPersonInfo[] = items
+                    .filter(p => p.id)
+                    .map(p => ({
+                      Id: Number(p.id),
+                      Title: p.text || '',
+                      EMail: p.secondaryText || '',
+                    }))
+                    .filter(p => !isNaN(p.Id));
+                  this.setState({ formData: { ...formData, picUsers } });
                 }}
               />
             </div>
@@ -303,28 +289,20 @@ export default class DivisionServiceManagement extends React.Component<
               <PeoplePicker
                 key={String(this.state.selectedItem?.Id)}
                 context={peoplePickerContext}
-                personSelectionLimit={1}
                 groupName=""
                 ensureUser={true}
                 principalTypes={[PrincipalType.User]}
                 defaultSelectedUsers={defaultManagerUsers}
                 onChange={(items: IPersonaProps[]) => {
-                  if (items.length > 0) {
-                    const rawId = items[0].id;
-                    const managerId = rawId ? Number(rawId) : undefined;
-                    this.setState({
-                      formData: {
-                        ...formData,
-                        managerId: managerId && !isNaN(managerId) ? managerId : undefined,
-                        managerDisplayName: items[0].text || '',
-                        managerEmail: items[0].secondaryText || '',
-                      },
-                    });
-                  } else {
-                    this.setState({
-                      formData: { ...formData, managerId: undefined, managerDisplayName: '', managerEmail: '' },
-                    });
-                  }
+                  const managerUsers: IPersonInfo[] = items
+                    .filter(p => p.id)
+                    .map(p => ({
+                      Id: Number(p.id),
+                      Title: p.text || '',
+                      EMail: p.secondaryText || '',
+                    }))
+                    .filter(p => !isNaN(p.Id));
+                  this.setState({ formData: { ...formData, managerUsers } });
                 }}
               />
             </div>
@@ -361,7 +339,7 @@ export default class DivisionServiceManagement extends React.Component<
         <div className={styles.content}>
           <div className={styles.filterSection}>
             <div className={styles.filterGroup}>
-              <label htmlFor="division-service-year-filter">Year</label>
+              <label htmlFor="division-service-year-filter">Please select a year to view data</label>
               <select
                 id="division-service-year-filter"
                 className={styles.filterSelect}

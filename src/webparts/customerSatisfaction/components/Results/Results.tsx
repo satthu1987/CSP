@@ -278,7 +278,7 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
                 </div>
                 <div className={styles.colResult}>{this.getGridPreviewText(plan.Results) || '—'}</div>
                 <div className={styles.colLink}>
-                  {plan.RelatedLinks ? <a href={this.htmlToPlainText(plan.RelatedLinks) || '—'}>View</a> : "-" }
+                  {plan.RelatedLinks ? <a href={this.htmlToPlainText(plan.RelatedLinks) || '—'} target="_blank">View</a> : "-" }
                 </div>
                 <div className={styles.colAction}>
                   <Icon
@@ -302,7 +302,7 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
 
     return (
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>{label} -{selectedyear} Overall Result</h2>
+        <h2 className={styles.sectionTitle}>{label} - {selectedyear} Overall Result</h2>
 
         {isLoadingAc ? (
           <div className={styles.spinnerContainer}>
@@ -391,7 +391,7 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
               <div className={styles.formGroup}>
                 <label>Related Links</label>
                 <div className={styles.readOnlyText}>
-                  {selectedActionPlan.RelatedLinks ? <a href={selectedActionPlan.RelatedLinks}>{selectedActionPlan.RelatedLinks}</a> : "-" }
+                  {selectedActionPlan.RelatedLinks ? <a href={selectedActionPlan.RelatedLinks} target="_blank">{selectedActionPlan.RelatedLinks}</a> : "-" }
                 </div>
               </div>
             </div>

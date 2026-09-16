@@ -61,12 +61,14 @@
   min-width: 220px;
 
   label {
-    font-size: 14px;
-    font-weight: bolder;
+    font-size: 12px;
+    font-weight: 600;
     color: #666;
     text-transform: uppercase;
   }
 }
+
+
 
 .filterSelect {
   padding: 8px 12px;
@@ -303,6 +305,7 @@
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
+  width: fit-content;
 }
 
 .statusOpen {

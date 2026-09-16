@@ -268,13 +268,9 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
     }
 
     if (success && formData.picId) {
-      success = await this.divisionService.clearAssignmentsForUser(formData.picId);
-
-      if (success && formData.role === 'Manager') {
+      if (formData.role === 'Manager') {
         success = await this.divisionService.assignManagerToDivisions(formData.picId, formData.selectedAssignments);
-      }
-
-      if (success && formData.role === 'Leader') {
+      } else if (formData.role === 'Leader') {
         success = await this.divisionService.assignLeaderToServices(formData.picId, formData.selectedAssignments);
       }
     }

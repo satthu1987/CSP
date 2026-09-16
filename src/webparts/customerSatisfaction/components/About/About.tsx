@@ -29,7 +29,11 @@ export default class About extends React.Component<IAboutProps, IAboutState> {
   }
 
   public async componentDidMount(): Promise<void> {
-    const content = await this.learnMoreService.getAllContent();
+    const allContent = await this.learnMoreService.getAllContent();
+    // 'How It Works' is now displayed on the Home view
+    const content = allContent.filter(
+      item => item.Title?.trim().toLowerCase() !== 'how it works'
+    );
     this.setState({ content, isLoading: false });
   }
 
@@ -70,9 +74,6 @@ export default class About extends React.Component<IAboutProps, IAboutState> {
     return (
       <main className={styles.main}>
         <section className={styles.informationSection}>
-          <h3 style={{ color: '#000000', fontWeight:'normal' }}>Welcome to the Customer Satisfaction Program (CSP)! The program is designed to measure customer satisfaction actively and to identify opportunities for service improvement within Enterprise Services Vietnam (ESVN).
-As a part of Innovation Group, we provides a variety of services in Sale Support, Internal Support, and Software Support to Simpson Strong-Tie worldwide.
-</h3>
           {isLoading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
               <Spinner size={SpinnerSize.medium} label="Loading content..." />
