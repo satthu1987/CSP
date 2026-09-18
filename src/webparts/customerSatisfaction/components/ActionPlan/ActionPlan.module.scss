@@ -215,8 +215,7 @@
 }
 
 .colStatus {
-  color: #666;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .colAction {
@@ -263,7 +262,7 @@
 
 .badge {
   display: inline-block;
-  padding: 4px 12px;
+  padding: 3px 10px;
   border-radius: 12px;
   font-size: 12px;
   font-weight: 600;
@@ -272,18 +271,18 @@
 }
 
 .statusOpen {
-  background-color: #e3f2fd;
-  color: #1976d2;
+  background: #e3f2fd;
+  color: #1565c0;
 }
 
 .statusInProgress {
-  background-color: #fff3e0;
-  color: #f57c00;
+  background: #fff3e0;
+  color: #e65100;
 }
 
 .statusClosed {
-  background-color: #e8f5e9;
-  color: #388e3c;
+  background: #e8f5e9;
+  color: #2e7d32;
 }
 
 .detailPanel {

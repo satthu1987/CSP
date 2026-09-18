@@ -326,11 +326,13 @@ export default class ActionPlan extends React.Component<IActionPlanProps, IActio
 
   private getStatusClassName(status: string | undefined): string {
     switch (status?.toLowerCase()) {
-      case 'open':
+      case 'not started':
         return styles.statusOpen;
       case 'in progress':
         return styles.statusInProgress;
       case 'closed':
+        return styles.statusClosed;
+      case 'completed':
         return styles.statusClosed;
       default:
         return '';

@@ -185,10 +185,16 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
 
   private getStatusClass(status: string): string {
     switch ((status || '').toLowerCase()) {
-      case 'open': return styles.statusOpen;
-      case 'in progress': return styles.statusInProgress;
-      case 'closed': return styles.statusClosed;
-      default: return styles.statusOpen;
+      case 'not started':
+        return styles.statusOpen;
+      case 'in progress':
+        return styles.statusInProgress;
+      case 'closed':
+        return styles.statusClosed;
+      case 'completed':
+        return styles.statusClosed;
+      default:
+        return '';
     }
   }
   private htmlToPlainText(value: string | undefined): string {
@@ -385,7 +391,7 @@ export default class Results extends React.Component<IResultsProps, IResultsStat
                 </span>
               </div>
               <div className={styles.formGroup}>
-                <label>Results</label>
+                <label>Action Output</label>
                 <div className={styles.readOnlyValue} dangerouslySetInnerHTML={{ __html: selectedActionPlan.Results || '—' }} />
               </div>
               <div className={styles.formGroup}>

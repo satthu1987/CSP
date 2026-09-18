@@ -86,7 +86,7 @@ export class CSPUserRole_Service {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,Title,PIC/Id,PIC/EMail,PIC/Title,Role&$expand=PIC&$orderby=PIC/Title asc`;
+        `?$select=Id,Title,PIC/Id,PIC/EMail,PIC/Title,Role&$expand=PIC&$orderby=Id asc`;
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.get(
         endpoint,
@@ -106,6 +106,97 @@ export class CSPUserRole_Service {
     }
   }
 
+  private async getUserLoginNameById(userId: number): Promise<string | undefined> {
+    try {
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/getuserbyid(${userId})?$select=LoginName`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('getUserLoginNameById failed for user', userId, response.status);
+        return undefined;
+      }
+
+      const data = await response.json();
+      return data.LoginName as string;
+    } catch (error) {
+      console.error('CSPUserRole_Service getUserLoginNameById error:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Sets the PIC multi-user field on a CSP_UserRole item using ValidateUpdateListItem,
+   * which accepts field values as an opaque JSON-stringified array of
+   * `{Key: <login name>}` objects instead of a typed OData multi-value array. This avoids
+   * the "StartArray/StartObject/PrimitiveValue expected" errors seen when sending
+   * `PICId` as part of a plain item POST/MERGE body.
+   */
+  private async setPicField(itemId: number, picId: number): Promise<boolean> {
+    try {
+      const loginName = await this.getUserLoginNameById(picId);
+      if (!loginName) {
+        console.error('setPicField: could not resolve login name for user', picId);
+        return false;
+      }
+
+      const fieldValue = JSON.stringify([{ Key: loginName }]);
+
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items(${itemId})/validateupdatelistitem`;
+
+      const body = {
+        formValues: [
+          {
+            FieldName: 'PIC',
+            FieldValue: fieldValue,
+          },
+        ],
+        bNewDocumentUpdate: false,
+      };
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.post(
+        endpoint,
+        SPHttpClient.configurations.v1,
+        {
+          body: JSON.stringify(body),
+          headers: {
+            Accept: 'application/json;odata=nometadata',
+            'Content-Type': 'application/json;odata=nometadata',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.error('setPicField request failed:', response.status);
+        return false;
+      }
+
+      const data = await response.json();
+      const results: Array<{ ErrorMessage?: string; HasException?: boolean }> = Array.isArray(data)
+        ? data
+        : Array.isArray(data.value)
+        ? data.value
+        : [];
+      const fieldError = results.filter(r => r.HasException || r.ErrorMessage);
+      if (fieldError.length > 0) {
+        console.error('setPicField field-level error:', fieldError);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('CSPUserRole_Service setPicField error:', error);
+      return false;
+    }
+  }
+
   /**
    * Creates a new role item in CSP_UserRole list.
    */
@@ -115,7 +206,9 @@ export class CSPUserRole_Service {
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items`;
 
-      const body = JSON.stringify({ PICId: picId, Role: role });
+      const body = JSON.stringify({
+        Role: role,
+      });
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.post(
         endpoint,
@@ -129,7 +222,19 @@ export class CSPUserRole_Service {
         }
       );
 
-      return response.ok;
+      if (!response.ok) {
+        console.error('CSPUserRole_Service createRole - item creation failed:', response.status);
+        return false;
+      }
+
+      const data = await response.json();
+      const newItemId = data.Id as number;
+      if (!newItemId) {
+        console.error('CSPUserRole_Service createRole - no Id in created item response:', data);
+        return false;
+      }
+
+      return this.setPicField(newItemId, picId);
     } catch (error) {
       console.error('CSPUserRole_Service createRole error:', error);
       return false;
@@ -145,7 +250,9 @@ export class CSPUserRole_Service {
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items(${id})`;
 
-      const body = JSON.stringify({ PICId: picId, Role: role });
+      const body = JSON.stringify({
+        Role: role,
+      });
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.post(
         endpoint,
@@ -161,7 +268,12 @@ export class CSPUserRole_Service {
         }
       );
 
-      return response.ok;
+      if (!response.ok) {
+        console.error('CSPUserRole_Service updateRole - item update failed:', response.status);
+        return false;
+      }
+
+      return this.setPicField(id, picId);
     } catch (error) {
       console.error('CSPUserRole_Service updateRole error:', error);
       return false;

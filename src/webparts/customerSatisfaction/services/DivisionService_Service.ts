@@ -15,6 +15,13 @@ export class DivisionServiceService {
     return value.replace(/'/g, "''");
   }
 
+  /**
+   * Updates a list item using the default JSON Light (minimal metadata, OData v4) format that
+   * SPHttpClient.configurations.v1 sends by default. In this format, multi-value fields
+   * (e.g. multi-user PIC/Manager columns) must be sent as a PLAIN ARRAY of ids — wrapping
+   * them in `{ results: [...] }` (an odata=verbose construct) causes SharePoint to reject the
+   * request with "StartObject node found... PrimitiveValue node was expected."
+   */
   private async updateListItem(itemId: number, payload: { [key: string]: unknown }): Promise<boolean> {
     const endpoint =
       `${this.context.pageContext.web.absoluteUrl}` +
@@ -35,6 +42,100 @@ export class DivisionServiceService {
     );
 
     return response.ok;
+  }
+
+  private async getUserLoginNameById(userId: number): Promise<string | undefined> {
+    try {
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/getuserbyid(${userId})?$select=LoginName`;
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
+
+      if (!response.ok) {
+        console.error('getUserLoginNameById failed for user', userId, response.status);
+        return undefined;
+      }
+
+      const data = await response.json();
+      return data.LoginName as string;
+    } catch (error) {
+      console.error('DivisionServiceService getUserLoginNameById error:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Updates a multi-value Person/Group field (e.g. PIC, Manager) using SharePoint's
+   * ValidateUpdateListItem REST method. Unlike a plain item MERGE/PATCH, this method
+   * accepts field values as an opaque JSON-stringified array of `{Key: <login name>}`
+   * objects, which avoids the typed OData multi-value array format
+   * (`[...]` vs `{results:[...]}`) that has been rejected inconsistently by this
+   * tenant with "StartArray/StartObject/PrimitiveValue expected" errors.
+   */
+  private async updateMultiUserField(
+    itemId: number,
+    fieldInternalName: string,
+    userIds: number[]
+  ): Promise<boolean> {
+    try {
+      const loginNames = (
+        await Promise.all(userIds.map(id => this.getUserLoginNameById(id)))
+      ).filter((loginName): loginName is string => !!loginName);
+
+      const fieldValue = JSON.stringify(loginNames.map(loginName => ({ Key: loginName })));
+
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items(${itemId})/validateupdatelistitem`;
+
+      const body = {
+        formValues: [
+          {
+            FieldName: fieldInternalName,
+            FieldValue: fieldValue,
+          },
+        ],
+        bNewDocumentUpdate: false,
+      };
+
+      const response: SPHttpClientResponse = await this.context.spHttpClient.post(
+        endpoint,
+        SPHttpClient.configurations.v1,
+        {
+          body: JSON.stringify(body),
+          headers: {
+            Accept: 'application/json;odata=nometadata',
+            'Content-Type': 'application/json;odata=nometadata',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.error('updateMultiUserField request failed:', fieldInternalName, response.status);
+        return false;
+      }
+
+      const data = await response.json();
+      const results: Array<{ ErrorMessage?: string; HasException?: boolean }> = Array.isArray(data)
+        ? data
+        : Array.isArray(data.value)
+        ? data.value
+        : [];
+      const fieldError = results.filter(r => r.HasException || r.ErrorMessage);
+      if (fieldError.length > 0) {
+        console.error('updateMultiUserField field-level error:', fieldInternalName, fieldError);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('DivisionServiceService updateMultiUserField error:', error);
+      return false;
+    }
   }
 
   public async getAllDivisions(): Promise<string[]> {
@@ -397,13 +498,29 @@ export class DivisionServiceService {
     if (payload.year !== undefined) {
       updatePayload.Year = payload.year;
     }
+
+    if (Object.keys(updatePayload).length > 0) {
+      const updated = await this.updateListItem(itemId, updatePayload);
+      if (!updated) {
+        return false;
+      }
+    }
+
     if (payload.picIds !== undefined) {
-      updatePayload.PICId = payload.picIds;
+      const updated = await this.updateMultiUserField(itemId, 'PIC', payload.picIds);
+      if (!updated) {
+        return false;
+      }
     }
+
     if (payload.managerIds !== undefined) {
-      updatePayload.ManagerId = payload.managerIds;
+      const updated = await this.updateMultiUserField(itemId, 'Manager', payload.managerIds);
+      if (!updated) {
+        return false;
+      }
     }
-    return this.updateListItem(itemId, updatePayload);
+
+    return true;
   }
 
   /**
@@ -620,7 +737,7 @@ export class DivisionServiceService {
       const endpoint =
         `${this.context.pageContext.web.absoluteUrl}` +
         `/_api/web/lists/getbytitle('${this.listName}')/items` +
-        `?$select=Id,PICId,ManagerId&$filter=PICId eq ${userId} or ManagerId eq ${userId}`;
+        `?$select=Id,PICId,ManagerId`;
 
       const response: SPHttpClientResponse = await this.context.spHttpClient.get(
         endpoint,
@@ -634,21 +751,30 @@ export class DivisionServiceService {
 
       const data = await response.json();
       const rows = Array.isArray(data.value)
-        ? (data.value as Array<{ Id: number; PICId?: number; ManagerId?: number }>)
+        ? (data.value as Array<{ Id: number; PICId?: number | number[]; ManagerId?: number | number[] }>)
         : [];
 
       for (const row of rows) {
-        const payload: { PICId?: null; ManagerId?: null } = {};
+        const picIds = this.allUserIds(row.PICId);
+        const managerIds = this.allUserIds(row.ManagerId);
 
-        if (row.PICId === userId) {
-          payload.PICId = null;
-        }
-        if (row.ManagerId === userId) {
-          payload.ManagerId = null;
+        if (picIds.indexOf(userId) !== -1) {
+          const updated = await this.updateMultiUserField(
+            row.Id,
+            'PIC',
+            picIds.filter(id => id !== userId)
+          );
+          if (!updated) {
+            return false;
+          }
         }
 
-        if (Object.keys(payload).length > 0) {
-          const updated = await this.updateListItem(row.Id, payload);
+        if (managerIds.indexOf(userId) !== -1) {
+          const updated = await this.updateMultiUserField(
+            row.Id,
+            'Manager',
+            managerIds.filter(id => id !== userId)
+          );
           if (!updated) {
             return false;
           }
@@ -663,43 +789,48 @@ export class DivisionServiceService {
   }
 
   /**
-   * Adds the given user as Manager (multi-user field) on every Division_Service item
-   * belonging to the given divisions. Existing PIC/Manager assignments on those items
-   * are preserved — the user is only appended if not already present.
+   * Syncs the given user's Manager (multi-user field) assignment across ALL Division_Service
+   * items: the user is added to the Manager column of items whose Division is in
+   * `selectedDivisions` (if not already present), and removed from the Manager column of
+   * items whose Division is NOT in `selectedDivisions` (if currently present). Other users
+   * already in PIC/Manager on those items are always preserved.
    */
-  public async assignManagerToDivisions(userId: number, divisions: string[]): Promise<boolean> {
+  public async assignManagerToDivisions(userId: number, selectedDivisions: string[]): Promise<boolean> {
     try {
-      for (const division of divisions) {
-        const escapedDivision = this.escapeODataValue(division);
-        const endpoint =
-          `${this.context.pageContext.web.absoluteUrl}` +
-          `/_api/web/lists/getbytitle('${this.listName}')/items` +
-          `?$select=Id,ManagerId&$filter=Division eq '${escapedDivision}'`;
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items` +
+        `?$select=Id,Division,ManagerId`;
 
-        const response: SPHttpClientResponse = await this.context.spHttpClient.get(
-          endpoint,
-          SPHttpClient.configurations.v1
-        );
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
 
-        if (!response.ok) {
-          console.error('Failed to fetch items for division assignment:', response.status, division);
-          return false;
+      if (!response.ok) {
+        console.error('Failed to fetch items for manager assignment sync:', response.status);
+        return false;
+      }
+
+      const data = await response.json();
+      const rows = Array.isArray(data.value)
+        ? (data.value as Array<{ Id: number; Division?: string; ManagerId?: number | number[] }>)
+        : [];
+
+      for (const row of rows) {
+        const existingIds = this.allUserIds(row.ManagerId);
+        const hasUser = existingIds.indexOf(userId) !== -1;
+        const isSelected = selectedDivisions.indexOf(row.Division || '') !== -1;
+
+        let newIds: number[] | undefined;
+        if (isSelected && !hasUser) {
+          newIds = [...existingIds, userId];
+        } else if (!isSelected && hasUser) {
+          newIds = existingIds.filter(id => id !== userId);
         }
 
-        const data = await response.json();
-        const rows = Array.isArray(data.value)
-          ? (data.value as Array<{ Id: number; ManagerId?: number | number[] }>)
-          : [];
-
-        for (const row of rows) {
-          const existingIds = this.allUserIds(row.ManagerId);
-          if (existingIds.indexOf(userId) !== -1) {
-            continue;
-          }
-
-          const updated = await this.updateListItem(row.Id, {
-            ManagerId: [...existingIds, userId],
-          });
+        if (newIds) {
+          const updated = await this.updateMultiUserField(row.Id, 'Manager', newIds);
           if (!updated) {
             return false;
           }
@@ -714,43 +845,48 @@ export class DivisionServiceService {
   }
 
   /**
-   * Adds the given user as PIC (multi-user field) on every Division_Service item
-   * belonging to the given services. Existing PIC/Manager assignments on those items
-   * are preserved — the user is only appended if not already present.
+   * Syncs the given user's PIC (multi-user field) assignment across ALL Division_Service
+   * items: the user is added to the PIC column of items whose Service is in
+   * `selectedServices` (if not already present), and removed from the PIC column of items
+   * whose Service is NOT in `selectedServices` (if currently present). Other users already
+   * in PIC/Manager on those items are always preserved.
    */
-  public async assignLeaderToServices(userId: number, services: string[]): Promise<boolean> {
+  public async assignLeaderToServices(userId: number, selectedServices: string[]): Promise<boolean> {
     try {
-      for (const service of services) {
-        const escapedService = this.escapeODataValue(service);
-        const endpoint =
-          `${this.context.pageContext.web.absoluteUrl}` +
-          `/_api/web/lists/getbytitle('${this.listName}')/items` +
-          `?$select=Id,PICId&$filter=Service eq '${escapedService}'`;
+      const endpoint =
+        `${this.context.pageContext.web.absoluteUrl}` +
+        `/_api/web/lists/getbytitle('${this.listName}')/items` +
+        `?$select=Id,Service,PICId`;
 
-        const response: SPHttpClientResponse = await this.context.spHttpClient.get(
-          endpoint,
-          SPHttpClient.configurations.v1
-        );
+      const response: SPHttpClientResponse = await this.context.spHttpClient.get(
+        endpoint,
+        SPHttpClient.configurations.v1
+      );
 
-        if (!response.ok) {
-          console.error('Failed to fetch items for service assignment:', response.status, service);
-          return false;
+      if (!response.ok) {
+        console.error('Failed to fetch items for leader assignment sync:', response.status);
+        return false;
+      }
+
+      const data = await response.json();
+      const rows = Array.isArray(data.value)
+        ? (data.value as Array<{ Id: number; Service?: string; PICId?: number | number[] }>)
+        : [];
+
+      for (const row of rows) {
+        const existingIds = this.allUserIds(row.PICId);
+        const hasUser = existingIds.indexOf(userId) !== -1;
+        const isSelected = selectedServices.indexOf(row.Service || '') !== -1;
+
+        let newIds: number[] | undefined;
+        if (isSelected && !hasUser) {
+          newIds = [...existingIds, userId];
+        } else if (!isSelected && hasUser) {
+          newIds = existingIds.filter(id => id !== userId);
         }
 
-        const data = await response.json();
-        const rows = Array.isArray(data.value)
-          ? (data.value as Array<{ Id: number; PICId?: number | number[] }>)
-          : [];
-
-        for (const row of rows) {
-          const existingIds = this.allUserIds(row.PICId);
-          if (existingIds.indexOf(userId) !== -1) {
-            continue;
-          }
-
-          const updated = await this.updateListItem(row.Id, {
-            PICId: [...existingIds, userId],
-          });
+        if (newIds) {
+          const updated = await this.updateMultiUserField(row.Id, 'PIC', newIds);
           if (!updated) {
             return false;
           }

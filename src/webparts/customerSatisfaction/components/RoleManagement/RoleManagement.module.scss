@@ -77,7 +77,7 @@
 
 .gridHeader {
   display: grid;
-  grid-template-columns: 0.5fr 1.5fr 1fr 2.5fr 0.75fr;
+  grid-template-columns: 0.5fr 1.5fr 1fr 1.5fr 0.75fr;
   gap: 16px;
   padding: 14px 16px;
   background: #f5f5f5;
@@ -89,7 +89,7 @@
 
 .gridRow {
   display: grid;
-  grid-template-columns: 0.5fr 1.5fr 1fr 2.5fr 0.75fr;
+  grid-template-columns: 0.5fr 1.5fr 1fr 1.5fr 0.75fr;
   gap: 16px;
   padding: 14px 16px;
   border-bottom: 1px solid #e0e0e0;

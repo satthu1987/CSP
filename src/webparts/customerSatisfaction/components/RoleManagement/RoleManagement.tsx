@@ -60,11 +60,25 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
     await this.loadRoles();
   }
 
+  /** PIC is a multi-user column: normalize its expanded value to an array of users. */
+  private getPicUsers(role: ICSPUserRole): Array<{ Id: number; EMail: string; Title: string }> {
+    const pic = role.PIC as unknown;
+    if (Array.isArray(pic)) {
+      return pic;
+    }
+    return pic ? [pic as { Id: number; EMail: string; Title: string }] : [];
+  }
+
   private loadRoles = async (): Promise<void> => {
     this.setState({ isLoading: true });
     try {
       const roles = await this.roleService.getAllRoles();
-      const roleScopes = await this.loadRoleScopes(roles);
+      let roleScopes: { [roleId: number]: string[] } = {};
+      try {
+        roleScopes = await this.loadRoleScopes(roles);
+      } catch (scopeError) {
+        console.error('Error loading role scopes:', scopeError);
+      }
       this.setState({ roles, roleScopes, isLoading: false });
     } catch (error) {
       console.error('Error loading roles:', error);
@@ -75,15 +89,26 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
   private loadRoleScopes = async (roles: ICSPUserRole[]): Promise<{ [roleId: number]: string[] }> => {
     const scopeEntries = await Promise.all(roles.map(async role => {
       const roleName = (role.Role || '').trim().toLowerCase();
-      const email = role.PIC?.EMail;
+      const emails = this.getPicUsers(role).map(user => (user.EMail || '').trim()).filter(Boolean);
 
-      if (!email || !this.requiresAssignments(roleName)) {
+      if (emails.length === 0 || !this.requiresAssignments(roleName)) {
         return [role.Id, []] as [number, string[]];
       }
 
-      const scope = roleName === 'manager'
-        ? await this.divisionService.getDivisionsByManager(email)
-        : await this.divisionService.getServicesByPIC(email);
+      const scopesByUser = await Promise.all(emails.map(email =>
+        roleName === 'manager'
+          ? this.divisionService.getDivisionsByManager(email)
+          : this.divisionService.getServicesByPIC(email)
+      ));
+
+      const scope: string[] = [];
+      scopesByUser.forEach(items => {
+        items.forEach(item => {
+          if (scope.indexOf(item) === -1) {
+            scope.push(item);
+          }
+        });
+      });
 
       return [role.Id, scope] as [number, string[]];
     }));
@@ -98,12 +123,12 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
     const roleName = (role.Role || '').trim().toLowerCase();
     const scope = this.state.roleScopes[role.Id] || [];
 
-    if (roleName !== 'Leader' && roleName !== 'Manager') {
+    if (roleName !== 'leader' && roleName !== 'manager') {
       return <span className={styles.scopeEmpty}>—</span>;
     }
 
     if (scope.length === 0) {
-      return <span className={styles.scopeEmpty}>No {roleName === 'Manager' ? 'divisions' : 'services'} assigned</span>;
+      return <span className={styles.scopeEmpty}>No {roleName === 'manager' ? 'divisions' : 'services'} assigned</span>;
     }
 
     return (
@@ -128,15 +153,18 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
   };
 
   private openEditPanel = async (role: ICSPUserRole): Promise<void> => {
+    const picUsers = this.getPicUsers(role);
+    const firstUser = picUsers.length > 0 ? picUsers[0] : undefined;
+
     this.setState({
       isPanelOpen: true,
       isNewMode: false,
       selectedRole: role,
       formData: {
         role: role.Role || 'visitor',
-        picId: role.PIC?.Id,
-        picDisplayName: role.PIC?.Title,
-        picEmail: role.PIC?.EMail,
+        picId: firstUser?.Id,
+        picDisplayName: firstUser?.Title,
+        picEmail: firstUser?.EMail,
         selectedAssignments: [],
       },
       assignmentOptions: [],
@@ -144,8 +172,9 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
       errorMsg: '',
     });
 
-    if (role.PIC?.EMail) {
-      await this.loadAssignmentOptions(role.Role || 'visitor', role.PIC.EMail);
+    const emails = picUsers.map(user => (user.EMail || '').trim()).filter(Boolean);
+    if (emails.length > 0) {
+      await this.loadAssignmentOptions(role.Role || 'visitor', emails);
     }
   };
 
@@ -160,7 +189,8 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
   };
 
   private requiresAssignments(role: string): boolean {
-    return role === 'Manager' || role === 'Leader';
+    const normalized = (role || '').trim().toLowerCase();
+    return normalized === 'manager' || normalized === 'leader';
   }
 
   private getAssignmentLabel(role: string): string {
@@ -173,7 +203,7 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
       : 'Select services this leader will lead.';
   }
 
-  private loadAssignmentOptions = async (role: string, userEmail?: string): Promise<void> => {
+  private loadAssignmentOptions = async (role: string, userEmails: string[]): Promise<void> => {
     if (!this.requiresAssignments(role)) {
       this.setState({ assignmentOptions: [], isLoadingAssignments: false });
       return;
@@ -186,12 +216,19 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
         ? await this.divisionService.getAllDivisions()
         : await this.divisionService.getAllServices();
 
-      let selectedAssignments: string[] = [];
-      if (userEmail) {
-        selectedAssignments = role === 'Manager'
-          ? await this.divisionService.getDivisionsByManager(userEmail)
-          : await this.divisionService.getServicesByPIC(userEmail);
-      }
+      const selectedAssignments: string[] = [];
+      const scopesByUser = await Promise.all(userEmails.map(email =>
+        role === 'Manager'
+          ? this.divisionService.getDivisionsByManager(email)
+          : this.divisionService.getServicesByPIC(email)
+      ));
+      scopesByUser.forEach(items => {
+        items.forEach(item => {
+          if (selectedAssignments.indexOf(item) === -1) {
+            selectedAssignments.push(item);
+          }
+        });
+      });
 
       this.setState(prevState => ({
         assignmentOptions: options,
@@ -217,7 +254,7 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
       errorMsg: '',
     }));
 
-    await this.loadAssignmentOptions(role, this.state.formData.picEmail);
+    await this.loadAssignmentOptions(role, this.state.formData.picEmail ? [this.state.formData.picEmail] : []);
   };
 
   private toggleAssignment = (value: string): void => {
@@ -288,7 +325,7 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
     }
   };
 
-  private handleDelete = async (id: number, picId?: number): Promise<void> => {
+  private handleDelete = async (id: number, picIds: number[]): Promise<void> => {
     if (!window.confirm('Are you sure you want to delete this role assignment?')) {
       return;
     }
@@ -296,7 +333,7 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
     try {
       const success = await this.roleService.deleteRole(id);
       if (success) {
-        if (picId) {
+        for (const picId of picIds) {
           await this.divisionService.clearAssignmentsForUser(picId);
         }
         await this.loadRoles();
@@ -336,7 +373,7 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
         {roles.map((role, index) => (
           <div key={role.Id} className={styles.gridRow}>
             <div className={styles.colNo}>{index + 1}</div>
-            <div className={styles.colPIC}>{role.PIC?.Title || '—'}</div>
+            <div className={styles.colPIC}>{this.getPicUsers(role).map(user => user.Title).filter(Boolean).join(', ') || '—'}</div>
             <div className={styles.colRole}>{role.Role || '—'}</div>
             <div className={styles.colScope}>{this.renderRoleScope(role)}</div>
             <div className={styles.colAction}>
@@ -350,7 +387,7 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
               <button
                 className={styles.editIcon}
                 title="Delete"
-                onClick={() => this.handleDelete(role.Id, role.PIC?.Id)}
+                onClick={() => this.handleDelete(role.Id, this.getPicUsers(role).map(user => user.Id).filter(id => typeof id === 'number'))}
               >
                 <Icon iconName="Delete" />
               </button>
@@ -454,7 +491,8 @@ export default class RoleManagement extends React.Component<IRoleManagementProps
                     });
 
                     if (formData.role === 'Leader' || formData.role === 'Manager') {
-                      this.loadAssignmentOptions(formData.role, items[0].secondaryText || '').catch(error => {
+                      const selectedEmail = (items[0].secondaryText || '').trim();
+                      this.loadAssignmentOptions(formData.role, selectedEmail ? [selectedEmail] : []).catch(error => {
                         console.error('Failed to load assignment options for selected user:', error);
                       });
                     }
